@@ -218,6 +218,8 @@ impl Subcommands {
             Subcommands::Edit { .. } => Edit,
             #[cfg(feature = "legacy")]
             Subcommands::Clean { .. } => Clean,
+            #[cfg(all(feature = "legacy", feature = "remote"))]
+            Subcommands::Remote { .. } => Unknown,
             Subcommands::Onboarding | Subcommands::EvalHook => Unknown,
         }
     }

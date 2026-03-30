@@ -245,6 +245,30 @@ async fn match_subcommand(
         Subcommands::Update(update_args::Platform { cmd }) => {
             command::update::handle(cmd, out, &app_settings).emit_metrics(metrics_ctx)
         }
+        #[cfg(all(feature = "legacy", feature = "remote"))]
+        Subcommands::Remote {
+            port,
+            bind_addr,
+            local,
+            named_tunnel,
+            origin,
+            dangerously_allow_anyone,
+            dev,
+        } => {
+            but_server::run(but_server::Config {
+                port: Some(port),
+                bind_addr,
+                tunnel: !local && named_tunnel.is_none(),
+                named_tunnel,
+                origin,
+                base_path: Some("/api".into()),
+                allow_anyone: dangerously_allow_anyone,
+                dev,
+                project_path: Some(args.current_dir.clone()),
+                verbose: args.trace > 0,
+            })
+            .await
+        }
         Subcommands::Help => {
             command::help::print_grouped(out)?;
             Ok(())

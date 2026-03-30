@@ -10,6 +10,12 @@ readme = "../../README.md"
 publish = false
 rust-version.workspace = true
 
+[package.metadata.cargo-machete]
+ignored = [
+    # Activated via `remote` or `irc` features (dev/nightly only), never imported directly in source.
+    "but-server",
+]
+
 [[bin]]
 name = "but"
 path = "src/main.rs"
@@ -44,6 +50,15 @@ legacy = [
     "dep:gitbutler-repo",
     "dep:gitbutler-repo-actions",
 ]
+## Enable IRC collaboration features (enabled for dev and nightly builds).
+irc = ["dep:but-server", "but-server/irc"]
+## Enable the `but remote` subcommand and embedded HTTP server (dev and nightly builds).
+## Brings in but-server and the embedded SvelteKit frontend.
+remote = ["dep:but-server", "embedded-frontend"]
+## Embed the SvelteKit frontend into the binary (only useful with `remote`).
+## If apps/desktop/build/ is absent at compile time the binary still builds but
+## returns 404 for frontend requests — build the frontend first to serve the UI.
+embedded-frontend = ["but-server?/embedded-frontend"]
 # Feature that enables profiling related features of the TUI.
 tui-profiling = []
 
@@ -68,6 +83,7 @@ but-llm.workspace = true
 
 # What follows is *basically* newly written crates that are built on top of legacy,
 # so need some refactoring/rethinking to become usable.
+but-server = { workspace = true, optional = true }
 but-action = { workspace = true, optional = true }
 # Still uses `gitbutler-stack`, but otherwise it is non-legacy.
 but-hunk-assignment.workspace = true
