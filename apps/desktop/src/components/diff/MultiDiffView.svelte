@@ -15,7 +15,7 @@
 	import Drawer from "$components/shared/Drawer.svelte";
 	import ReduxResult from "$components/shared/ReduxResult.svelte";
 	import { computeChangeStatus } from "$lib/files/fileStatus";
-	import { isExecutableStatus, type TreeChange } from "$lib/hunks/change";
+	import { isExecutableStatus } from "$lib/hunks/change";
 	import { DIFF_SERVICE } from "$lib/hunks/diffService.svelte";
 	import { FILE_SELECTION_MANAGER } from "$lib/selection/fileSelectionManager.svelte";
 	import { type SelectionId } from "$lib/selection/key";
@@ -24,6 +24,7 @@
 	import { inject } from "@gitbutler/core/context";
 	import { Button, FileViewHeader, HunkDiffSkeleton, VirtualList } from "@gitbutler/ui";
 	import { untrack } from "svelte";
+	import type { TreeChange } from "@gitbutler/but-sdk";
 
 	type Props = {
 		projectId: string;

@@ -10,13 +10,19 @@
  * Before applying the plan, this records an `Absorb` oplog snapshot and refreshes the
  * synthetic workspace commit after the rewritten commits are in place.
  */
-export declare function absorb(projectId: string, absorptionPlan: Array<CommitAbsorption>): Promise<number>
+export declare function absorb(
+	projectId: string,
+	absorptionPlan: Array<CommitAbsorption>,
+): Promise<number>;
 
 /**
  * Build an absorption plan for `target` using the behavior documented by
  * [`absorption_plan_with_perm()`].
  */
-export declare function absorptionPlan(projectId: string, target: AbsorptionTarget): Promise<Array<CommitAbsorption>>
+export declare function absorptionPlan(
+	projectId: string,
+	target: AbsorptionTarget,
+): Promise<Array<CommitAbsorption>>;
 
 /**
  * Applies `existing_branch` using the behavior described by
@@ -25,7 +31,7 @@ export declare function absorptionPlan(projectId: string, target: AbsorptionTarg
  * This acquires exclusive worktree access from `ctx`, applies
  * `existing_branch`, and records an oplog snapshot on success.
  */
-export declare function apply(projectId: string, existingBranch: string): Promise<ApplyOutcome>
+export declare function apply(projectId: string, existingBranch: string): Promise<ApplyOutcome>;
 
 /**
  * Persists `assignments` for the current workspace and records an oplog
@@ -36,9 +42,16 @@ export declare function apply(projectId: string, existingBranch: string): Promis
  *
  * See [`assign_hunk_with_perm()`] for details.
  */
-export declare function assignHunk(projectId: string, assignments: Array<HunkAssignmentRequest>): Promise<void>
+export declare function assignHunk(
+	projectId: string,
+	assignments: Array<HunkAssignmentRequest>,
+): Promise<void>;
 
-export declare function branchDetails(projectId: string, branchName: string, remote: string | null): Promise<BranchDetails>
+export declare function branchDetails(
+	projectId: string,
+	branchName: string,
+	remote: string | null,
+): Promise<BranchDetails>;
 
 /**
  * Computes the worktree-visible diff for `branch` in the current workspace.
@@ -47,10 +60,10 @@ export declare function branchDetails(projectId: string, branchName: string, rem
  * diff is computed against the current workspace state. For lower-level
  * implementation details, see [`but_workspace::ui::diff::changes_in_branch()`].
  */
-export declare function branchDiff(projectId: string, branch: string): Promise<TreeChanges>
+export declare function branchDiff(projectId: string, branch: string): Promise<TreeChanges>;
 
 /** See [`changes_in_worktree_with_perm()`]. */
-export declare function changesInWorktree(projectId: string): Promise<WorktreeChanges>
+export declare function changesInWorktree(projectId: string): Promise<WorktreeChanges>;
 
 /**
  * This UI-version of [`but_core::diff::worktree_changes()`] simplifies the `git status` information for display in
@@ -68,7 +81,7 @@ export declare function changesInWorktree(projectId: string): Promise<WorktreeCh
  * [`but_hunk_assignment::assignments_with_fallback()`], and
  * [`but_hunk_dependency::ui::hunk_dependencies_for_workspace_changes_by_worktree_dir()`].
  */
-export declare function changesInWorktreeWithPerm(projectId: string): Promise<WorktreeChanges>
+export declare function changesInWorktreeWithPerm(projectId: string): Promise<WorktreeChanges>;
 
 /**
  * Amend the commit at `commit_id` with `changes` and record an oplog snapshot on success.
@@ -78,7 +91,11 @@ export declare function changesInWorktreeWithPerm(projectId: string): Promise<Wo
  * lower-level implementation details, see
  * [`but_workspace::commit::commit_amend()`].
  */
-export declare function commitAmend(projectId: string, commitId: string, changes: Array<DiffSpec>): Promise<CommitCreateResult>
+export declare function commitAmend(
+	projectId: string,
+	commitId: string,
+	changes: Array<DiffSpec>,
+): Promise<CommitCreateResult>;
 
 /**
  * Insert a new commit built from `changes` and record an oplog snapshot on
@@ -90,7 +107,13 @@ export declare function commitAmend(projectId: string, commitId: string, changes
  * lower-level implementation details, see
  * [`but_workspace::commit::commit_create()`].
  */
-export declare function commitCreate(projectId: string, relativeTo: RelativeTo, side: InsertSide, changes: Array<DiffSpec>, message: string): Promise<CommitCreateResult>
+export declare function commitCreate(
+	projectId: string,
+	relativeTo: RelativeTo,
+	side: InsertSide,
+	changes: Array<DiffSpec>,
+	message: string,
+): Promise<CommitCreateResult>;
 
 /**
  * Computes commit details for `commit_id` with line statistics enabled.
@@ -98,13 +121,19 @@ export declare function commitCreate(projectId: string, relativeTo: RelativeTo, 
  * This exists for callers that always want line statistics without passing
  * `line_stats` explicitly.
  */
-export declare function commitDetailsWithLineStats(projectId: string, commitId: string): Promise<CommitDetails>
+export declare function commitDetailsWithLineStats(
+	projectId: string,
+	commitId: string,
+): Promise<CommitDetails>;
 
 /**
  * Discard `subject_commit_id` using the behavior described by
  * [`commit_discard_with_perm()`].
  */
-export declare function commitDiscard(projectId: string, subjectCommitId: string): Promise<CommitDiscardResult>
+export declare function commitDiscard(
+	projectId: string,
+	subjectCommitId: string,
+): Promise<CommitDiscardResult>;
 
 /**
  * Inserts a blank commit on `side` of `relative_to` and records an oplog
@@ -112,7 +141,11 @@ export declare function commitDiscard(projectId: string, subjectCommitId: string
  *
  * For details, see [`commit_insert_blank_with_perm()`].
  */
-export declare function commitInsertBlank(projectId: string, relativeTo: RelativeTo, side: InsertSide): Promise<CommitInsertBlankResult>
+export declare function commitInsertBlank(
+	projectId: string,
+	relativeTo: RelativeTo,
+	side: InsertSide,
+): Promise<CommitInsertBlankResult>;
 
 /**
  * Moves `subject_commit_id` to `side` of `relative_to` and records an oplog
@@ -123,7 +156,12 @@ export declare function commitInsertBlank(projectId: string, relativeTo: Relativ
  *
  * For details, see [`commit_move_with_perm()`].
  */
-export declare function commitMove(projectId: string, subjectCommitId: string, relativeTo: RelativeTo, side: InsertSide): Promise<CommitMoveResult>
+export declare function commitMove(
+	projectId: string,
+	subjectCommitId: string,
+	relativeTo: RelativeTo,
+	side: InsertSide,
+): Promise<CommitMoveResult>;
 
 /**
  * Moves `changes` from `source_commit_id` to `destination_commit_id` and
@@ -134,7 +172,12 @@ export declare function commitMove(projectId: string, subjectCommitId: string, r
  *
  * For details, see [`commit_move_changes_between_with_perm()`].
  */
-export declare function commitMoveChangesBetween(projectId: string, sourceCommitId: string, destinationCommitId: string, changes: Array<DiffSpec>): Promise<MoveChangesResult>
+export declare function commitMoveChangesBetween(
+	projectId: string,
+	sourceCommitId: string,
+	destinationCommitId: string,
+	changes: Array<DiffSpec>,
+): Promise<MoveChangesResult>;
 
 /**
  * Reword `commit_id` to `message` using the behavior described by
@@ -143,7 +186,11 @@ export declare function commitMoveChangesBetween(projectId: string, sourceCommit
  * This acquires exclusive worktree access from `ctx` before rewriting the
  * commit message and recording the oplog entry.
  */
-export declare function commitReword(projectId: string, commitId: string, message: string): Promise<CommitRewordResult>
+export declare function commitReword(
+	projectId: string,
+	commitId: string,
+	message: string,
+): Promise<CommitRewordResult>;
 
 /**
  * Squash `subject_commit_id` into `target_commit_id` and record an oplog
@@ -154,7 +201,11 @@ export declare function commitReword(projectId: string, commitId: string, messag
  *
  * For details, see [`commit_squash_with_perm()`].
  */
-export declare function commitSquash(projectId: string, subjectCommitId: string, targetCommitId: string): Promise<CommitSquashResult>
+export declare function commitSquash(
+	projectId: string,
+	subjectCommitId: string,
+	targetCommitId: string,
+): Promise<CommitSquashResult>;
 
 /**
  * Extract `changes` from `commit_id` and record the rewrite in the oplog.
@@ -164,7 +215,12 @@ export declare function commitSquash(projectId: string, subjectCommitId: string,
  *
  * See [`commit_uncommit_changes_with_perm()`] for details.
  */
-export declare function commitUncommitChanges(projectId: string, commitId: string, changes: Array<DiffSpec>, assignTo: string | null): Promise<MoveChangesResult>
+export declare function commitUncommitChanges(
+	projectId: string,
+	commitId: string,
+	changes: Array<DiffSpec>,
+	assignTo: string | null,
+): Promise<MoveChangesResult>;
 
 /** Undo `subject_commit_id` using the behavior described by [`commit_undo_only_with_perm()`]. */
 export declare function commitUndo(projectId: string, subjectCommitId: string): Promise<CommitUndoResult>
@@ -174,27 +230,41 @@ export declare function commitUndo(projectId: string, subjectCommitId: string): 
  *
  * This is determined by the forge the base branch is pointing to.
  */
-export declare function forgeProvider(projectId: string): Promise<ForgeName | null>
+export declare function forgeProvider(projectId: string): Promise<ForgeName | null>;
 
-export declare function getReview(projectId: string, reviewId: number): Promise<ForgeReview>
+export declare function getReview(projectId: string, reviewId: number): Promise<ForgeReview>;
 
-export declare function headInfo(projectId: string): Promise<RefInfo>
+export declare function headInfo(projectId: string): Promise<RefInfo>;
 
 /** Get the list of review template paths for the given project. */
-export declare function listAvailableReviewTemplates(projectId: string): Promise<Array<string>>
+export declare function listAvailableReviewTemplates(projectId: string): Promise<Array<string>>;
 
-export declare function listBranches(projectId: string, filter: BranchListingFilter | null): Promise<Array<BranchListing>>
+export declare function listBranches(
+	projectId: string,
+	filter: BranchListingFilter | null,
+): Promise<Array<BranchListing>>;
 
-export declare function listCiChecksAndUpdateCache(projectId: string, reference: string, cacheConfig: CacheConfig | null): Promise<Array<CiCheck>>
+export declare function listCiChecksAndUpdateCache(
+	projectId: string,
+	reference: string,
+	cacheConfig: CacheConfig | null,
+): Promise<Array<CiCheck>>;
 
-export declare function listProjectsStateless(): Promise<Array<ProjectForFrontend>>
+export declare function listProjectsStateless(): Promise<Array<ProjectForFrontend>>;
 
-export declare function listReviews(projectId: string, cacheConfig: CacheConfig | null): Promise<Array<ForgeReview>>
+export declare function listReviews(
+	projectId: string,
+	cacheConfig: CacheConfig | null,
+): Promise<Array<ForgeReview>>;
 
-export declare function listReviewsForBranch(projectId: string, branch: string, filter: ForgeReviewFilter | null): Promise<Array<ForgeReview>>
+export declare function listReviewsForBranch(
+	projectId: string,
+	branch: string,
+	filter: ForgeReviewFilter | null,
+): Promise<Array<ForgeReview>>;
 
 /** Merge a review on the forge. */
-export declare function mergeReview(projectId: string, reviewId: number): Promise<void>
+export declare function mergeReview(projectId: string, reviewId: number): Promise<void>;
 
 /**
  * Moves a branch using the behavior described by [`move_branch_with_perm()`].
@@ -202,11 +272,25 @@ export declare function mergeReview(projectId: string, reviewId: number): Promis
  * This acquires exclusive worktree access from `ctx`, moves `subject_branch`
  * on top of `target_branch`, and records an oplog snapshot on success.
  */
-export declare function moveBranch(projectId: string, subjectBranch: string, targetBranch: string): Promise<MoveBranchResult>
+export declare function moveBranch(
+	projectId: string,
+	subjectBranch: string,
+	targetBranch: string,
+): Promise<MoveBranchResult>;
 
-export declare function publishReview(projectId: string, params: CreateForgeReviewParams): Promise<ForgeReview>
+export declare function publishReview(
+	projectId: string,
+	params: CreateForgeReviewParams,
+): Promise<ForgeReview>;
 
-export declare function pushStackLegacy(projectId: string, stackId: string, withForce: boolean, skipForcePushProtection: boolean, branch: string, runHooks: boolean): Promise<PushResult>
+export declare function pushStackLegacy(
+	projectId: string,
+	stackId: string,
+	withForce: boolean,
+	skipForcePushProtection: boolean,
+	branch: string,
+	runHooks: boolean,
+): Promise<PushResult>;
 
 /**
  * Remove a branch from a stack.
@@ -217,7 +301,11 @@ export declare function pushStackLegacy(projectId: string, stackId: string, with
  * This can only be called on a branch that's inside of a stack of multiple branches and is not the top branch,
  * or on a branch that's empty.
  */
-export declare function removeBranch(projectId: string, stackId: string, branchName: string): Promise<void>
+export declare function removeBranch(
+	projectId: string,
+	stackId: string,
+	branchName: string,
+): Promise<void>;
 
 /**
  * Get the review template content for the given project and relative path.
@@ -225,19 +313,30 @@ export declare function removeBranch(projectId: string, stackId: string, branchN
  * This function determines the forge of a project and retrieves the review template
  * from the git config.
  */
-export declare function reviewTemplate(projectId: string): Promise<ReviewTemplateInfo | null>
+export declare function reviewTemplate(projectId: string): Promise<ReviewTemplateInfo | null>;
 
 /** Enable or disable a review's auto-merge. */
-export declare function setReviewAutoMerge(projectId: string, reviewId: number, enable: boolean): Promise<void>
+export declare function setReviewAutoMerge(
+	projectId: string,
+	reviewId: number,
+	enable: boolean,
+): Promise<void>;
 
 /** Set a review to draft or ready-for-review */
-export declare function setReviewDraftiness(projectId: string, reviewId: number, draft: boolean): Promise<void>
+export declare function setReviewDraftiness(
+	projectId: string,
+	reviewId: number,
+	draft: boolean,
+): Promise<void>;
 
 /**
  * Set the review template path in the git configuration for the given project.
  * The template path will be validated.
  */
-export declare function setReviewTemplate(projectId: string, templatePath: string | null): Promise<void>
+export declare function setReviewTemplate(
+	projectId: string,
+	templatePath: string | null,
+): Promise<void>;
 
 /**
  * Tears off a branch using the behavior described by [`tear_off_branch_with_perm()`].
@@ -245,7 +344,10 @@ export declare function setReviewTemplate(projectId: string, templatePath: strin
  * This acquires exclusive worktree access from `ctx`, tears `subject_branch`
  * out of its current stack, and records an oplog snapshot on success.
  */
-export declare function tearOffBranch(projectId: string, subjectBranch: string): Promise<MoveBranchResult>
+export declare function tearOffBranch(
+	projectId: string,
+	subjectBranch: string,
+): Promise<MoveBranchResult>;
 
 /**
  * Produces a unified patch for `change`.
@@ -253,7 +355,10 @@ export declare function tearOffBranch(projectId: string, subjectBranch: string):
  * `change` must not be a type change or a submodule change. For lower-level
  * implementation details, see [`but_core::TreeChange::unified_patch()`].
  */
-export declare function treeChangeDiffs(projectId: string, change: TreeChange): Promise<UnifiedPatch | null>
+export declare function treeChangeDiffs(
+	projectId: string,
+	change: TreeChange,
+): Promise<UnifiedPatch | null>;
 
 /**
  * Take the stack identified by `stack_id` out of the workspace.
@@ -264,7 +369,7 @@ export declare function treeChangeDiffs(projectId: string, change: TreeChange): 
  * See [`unapply_stack_with_perm()`] for how assigned changes are collected before
  * delegating to the underlying mutation.
  */
-export declare function unapplyStack(projectId: string, stackId: string): Promise<void>
+export declare function unapplyStack(projectId: string, stackId: string): Promise<void>;
 
 /**
  * Change the branch name from `branch_name` to `new_name` in the stack
@@ -275,10 +380,18 @@ export declare function unapplyStack(projectId: string, stackId: string): Promis
  *
  * See [`update_branch_name_with_perm()`] for the underlying mutation.
  */
-export declare function updateBranchName(projectId: string, stackId: string, branchName: string, newName: string): Promise<void>
+export declare function updateBranchName(
+	projectId: string,
+	stackId: string,
+	branchName: string,
+	newName: string,
+): Promise<void>;
 
 /** Update the stacked review descriptions to have the correct footers. */
-export declare function updateReviewFooters(projectId: string, reviews: Array<ForgeReviewDescriptionUpdate>): Promise<void>
+export declare function updateReviewFooters(
+	projectId: string,
+	reviews: Array<ForgeReviewDescriptionUpdate>,
+): Promise<void>;
 
 /**
  * Warm up the CI checks cache for all applied branches with PRs.
@@ -287,17 +400,17 @@ export declare function updateReviewFooters(projectId: string, reviews: Array<Fo
  * Additionally, it cleans up stale CI check entries for references that are no longer
  * part of any applied stack.
  */
-export declare function warmCiChecksCache(projectId: string): Promise<void>
+export declare function warmCiChecksCache(projectId: string): Promise<void>;
 export declare class WatcherHandle {
-  /** Stop the underlying watcher if it is still active. */
-  stop(): boolean
-  /** Returns true if this handle still owns a running watcher. */
-  get active(): boolean
+	/** Stop the underlying watcher if it is still active. */
+	stop(): boolean;
+	/** Returns true if this handle still owns a running watcher. */
+	get active(): boolean;
 }
 
 export interface WatcherEvent {
-  name: string
-  payload: WatcherPayload
+	name: string;
+	payload: WatcherPayload;
 }
 
 /**
@@ -306,7 +419,11 @@ export interface WatcherEvent {
  * `project_id` can be a project handle or legacy project id.
  * `callback` receives watcher events shaped as `{ name, payload }`.
  */
-export declare function watcherStart(projectId: string, callback: ((err: Error | null, arg: WatcherEvent) => any)): Promise<WatcherHandle>
+export declare function watcherStart(
+	projectId: string,
+	callback: (err: Error | null, arg: WatcherEvent) => any,
+): Promise<WatcherHandle>;
+
 
 // Auto-generated by but-ts. Do not edit manually.
 // Generated from JSON schemas registered by #[but_api] functions.
@@ -328,7 +445,7 @@ export type AbsorptionTarget = {
   type: "treeChanges";
   subject: {
     changes: Array<TreeChange>;
-    assigned_stack_id?: string | null;
+    assigned_stack_id: string | null;
   };
 } | {
   type: "all";
@@ -336,12 +453,12 @@ export type AbsorptionTarget = {
 
 export type ApiProject = {
   name: string;
-  description?: string | null;
+  description: string | null;
   repository_id: string;
   /** The "gitbuler data, i.e. oplog" URL */
   git_url: string;
   /** The "project" git URL */
-  code_git_url?: string | null;
+  code_git_url: string | null;
   created_at: string;
   updated_at: string;
   /** Determines if the project Operations log will be synched with the GitButHub */
@@ -349,6 +466,37 @@ export type ApiProject = {
   /** Determines if the project code will be synched with the GitButHub */
   sync_code?: boolean;
   reviews?: boolean;
+};
+
+export type AppSettings = {
+  /** The amount of context lines to show in unified diffs, above and below the hunk. */
+  contextLines: number;
+  /** Whether the user has passed the onboarding flow. */
+  onboardingComplete: boolean;
+  /** Telemetry settings */
+  telemetry: TelemetrySettings;
+  /** Client ID for the GitHub OAuth application. */
+  githubOauthApp: GitHubOAuthAppSettings;
+  /** Application feature flags. */
+  featureFlags: FeatureFlags;
+  /** Allows for additional "connect-src" hosts to be included. Requires app restart. */
+  extraCsp: ExtraCsp;
+  /** Settings related to fetching. */
+  fetch: Fetch;
+  /** Settings related to Claude Code. */
+  claude: Claude;
+  /** Settings related to code reviews and pull requests. */
+  reviews: Reviews;
+  /** UI settings. */
+  ui: UiSettings;
+  /**
+   * The duration between application update checks in seconds. If `0`, no update checks will be performed.
+   * This setting controls background update checks for both the CLI and GUI.
+   * In the future, this will replace the legacy `ui.checkForUpdatesIntervalInSeconds` setting.
+   */
+  appUpdatesCheckIntervalSec: number;
+  /** IRC integration settings. */
+  irc: IrcSettings;
 };
 
 /** JSON sibling of [`but_workspace::branch::apply::Outcome`]. */
@@ -377,6 +525,55 @@ export type Author = {
   gravatarUrl: string;
 };
 
+export type AutoCommitEvent = {
+  steps_length: number;
+  type: "started";
+} | {
+  parent_commit_id: string;
+  token: string;
+  type: "commitGeneration";
+} | {
+  commit_id: string;
+  type: "commitSuccess";
+} | {
+  error_message: string;
+  type: "commitError";
+} | {
+  type: "completed";
+};
+
+export type BaseBranch = {
+  branchName: string;
+  remoteName: string;
+  remoteUrl: string;
+  pushRemoteName: string;
+  pushRemoteUrl: string;
+  baseSha: string;
+  currentSha: string;
+  behind: number;
+  upstreamCommits: Array<RemoteCommit>;
+  recentCommits: Array<RemoteCommit>;
+  lastFetchedMs: number | null;
+  conflicted: boolean;
+  diverged: boolean;
+  divergedAhead: Array<string>;
+  divergedBehind: Array<string>;
+  shortName: string;
+};
+
+export type BaseBranchResolution = {
+  targetCommitOid: string;
+  approach: BaseBranchResolutionApproach;
+};
+
+export type BaseBranchResolutionApproach = {
+  type: "rebase";
+} | {
+  type: "merge";
+} | {
+  type: "hardReset";
+};
+
 /** Metadata about branches, associated with any Git branch. */
 export type Branch = {
   /** Standard data we want to know about any ref. */
@@ -388,10 +585,10 @@ export type Branch = {
 /** Represents a "commit author" or "signature", based on the data from the git history */
 export type BranchAuthor = {
   /** The name of the author as configured in the git config */
-  name?: string | null;
+  name: string | null;
   /** The email of the author as configured in the git config */
-  email?: string | null;
-  gravatarUrl?: string | null;
+  email: string | null;
+  gravatarUrl: string | null;
 };
 
 /** Information about the current state of a branch. */
@@ -408,9 +605,9 @@ export type BranchDetails = {
   /** Upstream reference, e.g. `refs/remotes/origin/base-branch-improvements` */
   remoteTrackingBranch: string | null;
   /** The pull(merge) request associated with the branch, or None if no such entity has not been created. */
-  prNumber?: number | null;
+  prNumber: number | null;
   /** A unique identifier for the GitButler review associated with the branch, if any. */
-  reviewId?: string | null;
+  reviewId: string | null;
   /**
    * This is the last commit in the branch, aka the tip of the branch.
    * If this is the only branch in the stack or the top-most branch, this is the tip of the stack.
@@ -425,7 +622,7 @@ export type BranchDetails = {
   /** The pushable status for the branch. */
   pushStatus: PushStatus;
   /** Last time, the branch was updated in Epoch milliseconds. */
-  lastUpdatedAt?: number | null;
+  lastUpdatedAt: number | null;
   /** All authors of the commits in the branch. */
   authors: Array<Author>;
   /** Whether the branch is conflicted. */
@@ -462,18 +659,18 @@ export type BranchIdentity = string;
  * This also combines the concept of a remote, local and virtual branch in order to provide a unified interface for the UI
  * Branch entry is not meant to contain all the data a branch can have (e.g. full commit history, all files and diffs, etc.).
  * It is intended a summary that can be quickly retrieved and displayed in the UI.
- * For more detailed information, each branch can be queried individually for it's `BranchData`.
+ * For more detailed information, each branch can be queried individually for its `BranchData`.
  */
 export type BranchListing = {
   /** The `identity` of the branch (e.g. `main`, `feature/branch`), excluding the remote name. */
-  name: BranchIdentity;
+  name: string;
   /**
    * This is a list of remotes that this branch can be found on (e.g. `origin`, `upstream` etc.),
    * by collecting remotes from all local branches with the same identity that have a tracking setup.
    */
   remotes: Array<string>;
   /** The branch may or may not have a virtual branch associated with it. */
-  stack?: StackReference | null;
+  stack: StackReference | null;
   /**
    * Timestamp in milliseconds since the branch was last updated.
    * This includes any commits, uncommitted changes or even updates to the branch metadata (e.g. renaming).
@@ -485,18 +682,62 @@ export type BranchListing = {
   hasLocal: boolean;
 };
 
+/** Represents a fat struct with all the data associated with a branch */
+export type BranchListingDetails = {
+  /** The name of the branch (e.g. `main`, `feature/branch`), excluding the remote name */
+  name: string;
+  /**
+   * The number of lines added within the branch
+   * Since the virtual branch, local branch and the remote one can have different number of lines removed,
+   * the value from the virtual branch (if present) takes the highest precedence,
+   * followed by the local branch and then the remote branches (taking the max if there are multiple).
+   * If this branch has a virtual branch, lines_added does NOT include the uncommitted lines.
+   */
+  linesAdded: number;
+  /**
+   * The number of lines removed within the branch
+   * Since the virtual branch, local branch and the remote one can have different number of lines removed,
+   * the value from the virtual branch (if present) takes the highest precedence,
+   * followed by the local branch and then the remote branches (taking the max if there are multiple)
+   * If this branch has a virtual branch, lines_removed does NOT include the uncommitted lines.
+   */
+  linesRemoved: number;
+  /**
+   * The number of files that were modified within the branch
+   * Since the virtual branch, local branch and the remote one can have different number files modified,
+   * the value from the virtual branch (if present) takes the highest precedence,
+   * followed by the local branch and then the remote branches (taking the max if there are multiple)
+   */
+  numberOfFiles: number;
+  /**
+   * The number of commits associated with a branch
+   * Since the virtual branch, local branch and the remote one can have different number of commits,
+   * the value from the virtual branch (if present) takes the highest precedence,
+   * followed by the local branch and then the remote branches (taking the max if there are multiple)
+   */
+  numberOfCommits: number;
+  /**
+   * A list of authors that have contributes commits to this branch.
+   * In the case of multiple remote tracking branches, or branches whose commits are evaluated,
+   * it takes the full list of unique authors, without applying a mailmap.
+   */
+  authors: Array<BranchAuthor>;
+  /** The branch may or may not have a virtual branch associated with it. */
+  stack: StackReference | null;
+};
+
 /** A filter that can be applied to the branch listing */
 export type BranchListingFilter = {
   /**
    * If the value is true, the listing will only include branches that have local references or virtual branches.
    * If the value is false, the listing will include only branches that have local references or virtual branches.
    */
-  local?: boolean | null;
+  local: boolean | null;
   /**
    * If the value is true, the listing will only include branches that are applied in the workspace.
    * If the value is false, the listing will only include branches that are not applied in the workspace.
    */
-  applied?: boolean | null;
+  applied: boolean | null;
 };
 
 /** A reference in `refs/heads`. */
@@ -505,6 +746,20 @@ export type BranchReference = {
   fullNameBytes: Array<number>;
   /** The short version of `full_name_bytes` for display. */
   displayName: string;
+};
+
+export type BranchStatus = {
+  type: "safelyUpdatable";
+} | {
+  type: "integrated";
+} | {
+  type: "conflicted";
+  subject: {
+    /** If the branch can be rebased onto the target without conflicts */
+    rebasable: boolean;
+  };
+} | {
+  type: "empty";
 };
 
 export type CacheConfig = "cacheOnly" | "noCache" | {
@@ -530,7 +785,7 @@ export type CiCheck = {
   id: number;
   name: string;
   output: CiOutput;
-  startedAt?: string | null;
+  startedAt: string | null;
   status: CiStatus;
   headSha: string;
   url: string;
@@ -552,8 +807,23 @@ export type CiOutput = {
 export type CiStatus = "inProgress" | "queued" | "unknown" | {
   complete: {
     conclusion: CiConclusion;
-    completed_at?: string | null;
+    completed_at: string | null;
   };
+};
+
+export type Claude = {
+  /** Path to the Claude Code executable. Defaults to "claude" if not set. */
+  executable: string;
+  /** Whether to show notifications when Claude Code finishes. */
+  notifyOnCompletion: boolean;
+  /** Whether to show notifications when Claude Code needs permission. */
+  notifyOnPermissionRequest: boolean;
+  /** Whether to dangerously allow all permissions without prompting. */
+  dangerouslyAllowAllPermissions: boolean;
+  /** Whether to automatically commit changes and rename branches after completion. */
+  autoCommitAfterCompletion: boolean;
+  /** Whether to use the configured model in .claude/settings.json instead of passing --model. */
+  useConfiguredModel: boolean;
 };
 
 /** Commit that is a part of a [`StackBranch`](gitbutler_stack::StackBranch) and, as such, containing state derived in relation to the specific branch. */
@@ -585,7 +855,7 @@ export type Commit = {
    * Optional URL to the Gerrit review for this commit, if applicable.
    * Only populated if Gerrit mode is enabled and the commit has an associated review.
    */
-  gerritReviewUrl?: string | null;
+  gerritReviewUrl: string | null;
 };
 
 /** Information about absorptions grouped by commit */
@@ -600,7 +870,7 @@ export type CommitAbsorption = {
 /** JSON transport type for creating a commit in the rebase graph. */
 export type CommitCreateResult = {
   /** The new commit if one was created. */
-  newCommit?: string | null;
+  newCommit: string | null;
   /** Changes that were rejected during commit creation. */
   rejectedChanges: Array<RejectedChange>;
   /**
@@ -617,9 +887,9 @@ export type CommitDetails = {
   /** The changes */
   changes: Array<TreeChange>;
   /** The stats of the changes. */
-  stats?: LineStats | null;
+  stats: LineStats | null;
   /** Conflicting entries in `commit` as stored in the conflict commit metadata. */
-  conflictEntries?: ConflictEntries | null;
+  conflictEntries: ConflictEntries | null;
 };
 
 /** JSON transport type for discarding a commit. */
@@ -703,6 +973,12 @@ export type ConflictEntries = {
   theirEntries: Array<string>;
 };
 
+export type ConflictEntryPresence = {
+  ours: boolean;
+  theirs: boolean;
+  ancestor: boolean;
+};
+
 export type CreateForgeReviewParams = {
   title: string;
   body: string;
@@ -771,6 +1047,56 @@ export type EditModeMetadata = {
 
 export type EntryKind = "Tree" | "Blob" | "BlobExecutable" | "Link" | "Commit";
 
+export type ExtraCsp = {
+  /** Additional hosts that the application can connect to. */
+  hosts: Array<string>;
+  /** Additional hosts for img-src that the application can load images from. */
+  imgSrc: Array<string>;
+};
+
+export type FeatureFlags = {
+  /** Turn on the set a v3 version of checkout */
+  cv3: boolean;
+  /** Use the V3 version of apply and unapply. */
+  apply3: boolean;
+  /**
+   * Enable undo/redo support.
+   *
+   * ### Progression for implementation
+   *
+   * * use snapshot system in undo/redo queue
+   *     - consider not referring to these objects by reference to `git gc` will catch them,
+   *       or even purge them on shutdown. Alternatively, keep them in-memory with in-memory objects.
+   * * add user-control to snapshot system to purge now, or purge after time X. That way data isn't stored forever.
+   * * Finally, consider implementing undo/redo with invasive primitives that are undoable/redoable themselves for
+   *   the most efficient solution, inherently in memory, i.e.
+   *     - CRUD reference
+   *     - CRUD metadata
+   *     - CRUD workspace
+   *     - CRUD files
+   */
+  undo: boolean;
+  /** Enable processing of workspace rules. */
+  rules: boolean;
+  /** Enable single branch mode. */
+  singleBranch: boolean;
+  /** Enable IRC integration. */
+  irc: boolean;
+  /**
+   * Control how the filesystem watch should be established.
+   * Possible values: "auto", "legacy", "modern".
+   * "auto" automatically picks based on platform heuristics (default).
+   * "legacy" uses recursive watching.
+   * "modern" uses ignore-aware non-recursive watching.
+   */
+  watchMode: string;
+};
+
+export type Fetch = {
+  /** The frequency at which the app will automatically fetch. A negative value (e.g. -1) disables auto fetching. */
+  autoFetchIntervalMinutes: number;
+};
+
 /** Information about a file being absorbed */
 export type FileAbsorption = {
   path: string;
@@ -797,9 +1123,9 @@ export type ForgeReview = {
   /** The title/summary of the review */
   title: string;
   /** The detailed description or body text of the review, if provided. */
-  body?: string | null;
+  body: string | null;
   /** The user who created this review. */
-  author?: ForgeReviewUser | null;
+  author: ForgeReviewUser | null;
   /** Labels or tags applied to categorize this review. */
   labels: Array<ForgeReviewLabel>;
   /** Whether this review is in draft state (not ready for final review). */
@@ -817,22 +1143,22 @@ export type ForgeReview = {
   /** The git commit SHA that this review is based on. */
   sha: string;
   /** ISO 8601 timestamp of when the review was created. */
-  createdAt?: string | null;
+  createdAt: string | null;
   /** ISO 8601 timestamp of when the review was last modified. */
-  modifiedAt?: string | null;
+  modifiedAt: string | null;
   /** ISO 8601 timestamp of when the review was merged, if applicable. */
-  mergedAt?: string | null;
+  mergedAt: string | null;
   /** ISO 8601 timestamp of when the review was closed, if applicable. */
-  closedAt?: string | null;
+  closedAt: string | null;
   /** SSH URL for cloning the repository containing this review. */
-  repositorySshUrl?: string | null;
+  repositorySshUrl: string | null;
   /** HTTPS URL for cloning the repository containing this review. */
-  repositoryHttpsUrl?: string | null;
+  repositoryHttpsUrl: string | null;
   /**
    * The owner (user or organization) of the repository from which the branch originates.
    * In the case of a fork, this will be the fork owner's username.
    */
-  repoOwner?: string | null;
+  repoOwner: string | null;
   /** Users who have been requested to review or have reviewed this code. */
   reviewers: Array<ForgeReviewUser>;
   /** The platform-specific symbol for this review type (e.g., "#" for GitHub pull requests and "!" for MRs). */
@@ -845,7 +1171,7 @@ export type ForgeReviewDescriptionUpdate = {
   /** The unique identifier number for this review within its repository. This can be a PR or MR number. */
   number: number;
   /** The current body/description of the review, which may be None if no description is set. */
-  body?: string | null;
+  body: string | null;
   /** The platform-specific symbol for this review type (e.g., "#" for GitHub pull requests and "!" for MRs). */
   unitSymbol: string;
 };
@@ -854,8 +1180,8 @@ export type ForgeReviewFilter = "today" | "thisWeek" | "thisMonth" | "all";
 
 export type ForgeReviewLabel = {
   name: string;
-  description?: string | null;
-  color?: string | null;
+  description: string | null;
+  color: string | null;
 };
 
 /**
@@ -870,11 +1196,11 @@ export type ForgeReviewUser = {
   /** The user's login username */
   login: string;
   /** The user's display name, if available */
-  name?: string | null;
+  name: string | null;
   /** The user's email address, if publicly available */
-  email?: string | null;
+  email: string | null;
   /** URL to the user's profile avatar image, if available */
-  avatarUrl?: string | null;
+  avatarUrl: string | null;
   /** Indicates whether this account is a bot account */
   isBot: boolean;
 };
@@ -896,6 +1222,24 @@ export type FullRefName = {
   full: string;
 };
 
+/** See [`GitConfigSettings`](crate::GitConfigSettings) for the docs. */
+export type GitConfigSettings = {
+  signCommits: boolean | null;
+  gitbutlerGerritMode: boolean | null;
+  gitbutlerForgeReviewTemplatePath: string | null;
+  gitbutlerGitlabProjectId: string | null;
+  gitbutlerGitlabUpstreamProjectId: string | null;
+  signingKey: string | null;
+  signingFormat: string | null;
+  gpgProgram: string | null;
+  gpgSshProgram: string | null;
+};
+
+export type GitHubOAuthAppSettings = {
+  /** Client ID for the GitHub OAuth application. Set this to use custom (non-GitButler) OAuth application. */
+  oauthClientId: string;
+};
+
 export type GithubAccountIdentifier = {
   type: "oAuthUsername";
   info: {
@@ -914,6 +1258,44 @@ export type GithubAccountIdentifier = {
   };
 };
 
+/**
+ * Serializable version of [`AuthStatusResponse`] with exposed access token.
+ *
+ * This struct is used for API responses where the access token needs to be
+ * sent as a plain string. Field names are converted to camelCase for JSON.
+ */
+export type GithubAuthStatusResponseSensitive = {
+  /** The GitHub access token as a plain string (sensitive data). */
+  accessToken: string;
+  /** The GitHub username/login. */
+  login: string;
+  /** The user's display name, if available. */
+  name: string | null;
+  /** The user's email address, if available. */
+  email: string | null;
+  /** The GitHub Enterprise host, if this is an enterprise account. */
+  host: string | null;
+};
+
+/**
+ * Serializable version of [`AuthenticatedUser`] with exposed access token.
+ *
+ * This struct represents an authenticated GitHub user with their credentials
+ * exposed as plain strings for API responses. Field names are converted to camelCase for JSON.
+ */
+export type GithubAuthenticatedUserSensitive = {
+  /** The GitHub access token as a plain string (sensitive data). */
+  accessToken: string;
+  /** The GitHub username/login. */
+  login: string;
+  /** The URL to the user's avatar image, if available. */
+  avatarUrl: string | null;
+  /** The user's display name, if available. */
+  name: string | null;
+  /** The user's email address, if available. */
+  email: string | null;
+};
+
 export type GitlabAccountIdentifier = {
   type: "patUsername";
   info: {
@@ -927,9 +1309,56 @@ export type GitlabAccountIdentifier = {
   };
 };
 
+/**
+ * Serializable version of [`AuthStatusResponse`] with exposed access token.
+ *
+ * This struct is used for API responses where the access token needs to be
+ * sent as a plain string. Field names are converted to camelCase for JSON.
+ */
+export type GitlabAuthStatusResponseSensitive = {
+  /** The GitLab access token as a plain string (sensitive data). */
+  accessToken: string;
+  /** The GitLab username. */
+  username: string;
+  /** The user's display name, if available. */
+  name: string | null;
+  /** The user's email address, if available. */
+  email: string | null;
+  /** The self-hosted GitLab host, if this is a self-hosted instance. */
+  host: string | null;
+};
+
+/**
+ * Serializable version of [`AuthenticatedUser`] with exposed access token.
+ *
+ * This struct represents an authenticated GitLab user with their credentials
+ * exposed as plain strings for API responses. Field names are converted to camelCase for JSON.
+ */
+export type GitlabAuthenticatedUserSensitive = {
+  /** The GitLab access token as a plain string (sensitive data). */
+  accessToken: string;
+  /** The GitLab username. */
+  username: string;
+  /** The URL to the user's avatar image, if available. */
+  avatarUrl: string | null;
+  /** The user's display name, if available. */
+  name: string | null;
+  /** The user's email address, if available. */
+  email: string | null;
+};
+
 export type GixTime = {
   seconds: number;
   offset: number;
+};
+
+export type HeadAndMode = {
+  head: string | null;
+  operatingMode: OperatingMode;
+};
+
+export type HeadSha = {
+  headSha: string;
 };
 
 export type HunkAssignment = {
@@ -939,12 +1368,12 @@ export type HunkAssignment = {
    *   - If a hunk is modified (i.e. it has gained or lost lines), the UUID remains the same.
    *   - If two or more hunks become merged (due to edits causing the contexts to overlap), the id of the hunk with the most lines is adopted.
    */
-  id?: string | null;
+  id: string | null;
   /**
    * The hunk that is being assigned. Together with path_bytes, this identifies the hunk.
    * If the file is binary, or too large to load, this will be None and in this case the path name is the only identity.
    */
-  hunkHeader?: HunkHeader | null;
+  hunkHeader: HunkHeader | null;
   /** The file path of the hunk. */
   path: string;
   /** The file path of the hunk in bytes. */
@@ -958,9 +1387,9 @@ export type HunkAssignment = {
    */
   branchRefBytes: Array<number> | null;
   /** The line numbers that were added in this hunk. */
-  lineNumsAdded?: Array<number> | null;
+  lineNumsAdded: Array<number> | null;
   /** The line numbers that were removed in this hunk. */
-  lineNumsRemoved?: Array<number> | null;
+  lineNumsRemoved: Array<number> | null;
 };
 
 /**
@@ -973,7 +1402,7 @@ export type HunkAssignmentRequest = {
    * If the file is binary, or too large to load, this will be None and in this case the path name is the only identity.
    * If the file has hunk headers, then header info MUST be provided.
    */
-  hunkHeader?: HunkHeader | null;
+  hunkHeader: HunkHeader | null;
   /** The file path of the hunk in bytes. */
   pathBytes: Array<number>;
   /**
@@ -1054,6 +1483,57 @@ export type IgnoredWorktreeTreeChangeStatus = "Conflict" | "TreeIndex" | "TreeIn
 /** Describes where relative to the selector a step should be inserted */
 export type InsertSide = "above" | "below";
 
+export type IntegrationOutcome = {
+  /** The list of branches that have been deleted as a result of the upstream integration */
+  deletedBranches: Array<string>;
+};
+
+export type IrcConnectionSettings = {
+  /** Whether this connection is enabled (controls connect/disconnect). */
+  enabled: boolean;
+  /** IRC nickname */
+  nickname: string | null;
+  /**
+   * Shared server connection password (the gate all clients must pass).
+   *
+   * # Security note
+   * Stored in plaintext on disk. Do not use a password that protects sensitive
+   * personal accounts — treat this as a low-value shared secret.
+   */
+  serverPassword: string | null;
+  /**
+   * Per-user SASL account password. On first use this registers the account.
+   *
+   * # Security note
+   * Stored in plaintext on disk. Do not reuse a password from another service.
+   */
+  saslPassword: string | null;
+  /** IRC real name */
+  realname: string | null;
+};
+
+export type IrcServerSettings = {
+  /** IRC server hostname (e.g., "irc.gitbutler.com") */
+  host: string;
+  /** IRC server port (default: 6697 for TLS) */
+  port: number;
+};
+
+export type IrcSettings = {
+  /** IRC server configuration */
+  server: IrcServerSettings;
+  /** Auto-share new Claude Code sessions to IRC channels */
+  autoShare: boolean;
+  /**
+   * Channel to auto-join when opening a project
+   * If set, joins that channel name (sanitized)
+   * If null, auto-constructs #project-name
+   */
+  projectChannel: string | null;
+  /** IRC connection settings */
+  connection: IrcConnectionSettings;
+};
+
 /** Line statistics obtained from diffing the blobs of one or more [TreeChange](crate::TreeChange). */
 export type LineStats = {
   /** The total amount of lines added in the between blobs of the two trees. */
@@ -1097,6 +1577,11 @@ export type MoveChangesResult = {
   replacedCommits: Record<string, string>;
 };
 
+export type NameAndStatus = {
+  name: string;
+  status: BranchStatus;
+};
+
 export type OperatingMode = {
   type: "OpenWorkspace";
 } | {
@@ -1109,7 +1594,7 @@ export type OperatingMode = {
 
 export type OutsideWorkspaceMetadata = {
   /** The name of the currently checked out branch or None if in detached head state. */
-  branchName?: string | null;
+  branchName: string | null;
   /** The paths of any files that would conflict with the workspace as it currently is */
   worktreeConflicts: Array<string>;
 };
@@ -1123,7 +1608,7 @@ export type OutsideWorkspaceMetadata = {
 export type ProjectForFrontend = {
   id: string;
   title: string;
-  description?: string | null;
+  description: string | null;
   /** The worktree directory of the project's repository. */
   path: string;
   /**
@@ -1144,15 +1629,15 @@ export type ProjectForFrontend = {
    * Does not affect hooks in `.git/hooks`.
    */
   husky_hooks_enabled?: boolean;
-  api?: ApiProject | null;
-  omit_certificate_check?: boolean | null;
-  snapshot_lines_threshold?: number | null;
-  forge_override?: string | null;
-  preferred_forge_user?: ForgeUser | null;
+  api: ApiProject | null;
+  omit_certificate_check: boolean | null;
+  snapshot_lines_threshold: number | null;
+  forge_override: string | null;
+  preferred_forge_user: ForgeUser | null;
   /** Gerrit mode enabled for this project, derived from git configuration */
   gerrit_mode?: boolean;
   /** Path to the forge review template, if set in git configuration. */
-  forge_review_template_path?: string | null;
+  forge_review_template_path: string | null;
   /** Tell if the project is known to be open in a Window in the frontend. */
   is_open: boolean;
 };
@@ -1162,9 +1647,9 @@ export type PullRequestMinimal = {
   number: number;
   url: string;
   baseRef: string;
-  baseRepoUrl?: string | null;
+  baseRepoUrl: string | null;
   headRef: string;
-  headRepoUrl?: string | null;
+  headRepoUrl: string | null;
 };
 
 /** JSON-friendly version of [`gitbutler_branch_actions::internal::PushResult`]. */
@@ -1192,7 +1677,7 @@ export type RefInfo = {
    * The name of the ref that points to a workspace commit,
    * *or* the name of the first stack segment.
    */
-  workspaceRef?: BranchReference | null;
+  workspaceRef: BranchReference | null;
   /**
    * The stacks visible in the current workspace.
    *
@@ -1206,7 +1691,7 @@ export type RefInfo = {
    * If `None`, this is a local workspace that doesn't know when possibly pushed branches are considered integrated.
    * This happens when there is a local branch checked out without a remote tracking branch.
    */
-  target?: Target | null;
+  target: Target | null;
   /**
    * The `workspace_ref_name` is `Some(_)` and belongs to GitButler, because it had metadata attached.
    * This will be `false` when in single-branch mode.
@@ -1253,6 +1738,16 @@ export type RelativeTo = {
   subject: Array<number>;
 };
 
+export type RemoteCommit = {
+  id: string;
+  description: string;
+  createdAt: number;
+  author: Author;
+  changeId: string | null;
+  parentIds: Array<string>;
+  conflicted: boolean;
+};
+
 /** A reference in `refs/remotes`. */
 export type RemoteTrackingReference = {
   /** The full ref name, like `refs/remotes/origin/on-remote`, for usage with the backend. */
@@ -1263,12 +1758,28 @@ export type RemoteTrackingReference = {
   remoteName: string;
 };
 
+export type Resolution = {
+  stackId: string;
+  approach: ResolutionApproach;
+  deleteIntegratedBranches: boolean;
+};
+
+export type ResolutionApproach = {
+  type: "rebase";
+} | {
+  type: "merge";
+} | {
+  type: "unapply";
+} | {
+  type: "delete";
+};
+
 /** Metadata about branches, associated with any Git branch. */
 export type Review = {
   /** The number for the PR that was associated with this branch. */
-  pullRequest?: number | null;
+  pullRequest: number | null;
   /** A handle to the review created with the GitButler review system. */
-  reviewId?: string | null;
+  reviewId: string | null;
 };
 
 /** Information about the project's review template. */
@@ -1277,6 +1788,11 @@ export type ReviewTemplateInfo = {
   path: string;
   /** The content of the review template. */
   content: string;
+};
+
+export type Reviews = {
+  /** Whether to auto-fill PR title and description from the first commit when a branch has only one commit. */
+  autoFillPrDescriptionFromCommit: boolean;
 };
 
 /** A segment of a commit graph, representing a set of commits exclusively. */
@@ -1289,12 +1805,12 @@ export type Segment = {
    * Finally, this is `None` of the original name can be found searching upwards, finding exactly one
    * named segment.
    */
-  refName?: BranchReference | null;
+  refName: BranchReference | null;
   /**
    * The name of the remote tracking branch of this segment, if present, i.e. `refs/remotes/origin/main`.
    * Its presence means that a remote is configured and that the stack content
    */
-  remoteTrackingRefName?: RemoteTrackingReference | null;
+  remoteTrackingRefName: RemoteTrackingReference | null;
   /**
    * The portion of commits that can be reached from the tip of the *branch* downwards, so that they are unique
    * for that stack segment and not included in any other stack or stack segment.
@@ -1317,12 +1833,12 @@ export type Segment = {
    * The list was created by walking all parents, not only the first parent.
    * This means the segment needs fixing.
    */
-  commitsOutside?: Array<Commit> | null;
+  commitsOutside: Array<Commit> | null;
   /**
    * Read-only metadata with additional information about the branch naming the segment,
    * or `None` if nothing was present.
    */
-  metadata?: Branch | null;
+  metadata: Branch | null;
   /**
    * This is `true` a segment in a workspace if the entrypoint of [the traversal](but_graph::Graph::from_commit_traversal)
    * is this segment, and the surrounding workspace is provided for context.
@@ -1347,7 +1863,19 @@ export type Segment = {
 /** Schema for `serde_error::Error` which serializes as `{description: string, source?: Error | null}`. */
 export type SerdeError = {
   description: string;
-  source?: any | null;
+  source: any | null;
+};
+
+/** Represents the order of changes (commits) in a series (branch). */
+export type SeriesOrder = {
+  /** Unique name of the series (branch). Must already exist in the stack. */
+  name: string;
+  /**
+   * This is the desired commit order for the series. Because the commits will be rebased,
+   * naturally, the commit ids will be different after updating.
+   * The changes are ordered from newest to oldest (most recent changes go first)
+   */
+  commitIds: Array<string>;
 };
 
 /** The UI-clone of `branch::Stack`. */
@@ -1368,6 +1896,60 @@ export type Stack = {
   segments: Array<Segment>;
 };
 
+/** Information about the current state of a stack */
+export type StackDetails = {
+  /** This is the name of the top-most branch, provided by the API for convenience */
+  derivedName: string;
+  /** The pushable status for the stack */
+  pushStatus: PushStatus;
+  /** The details about the contained branches */
+  branchDetails: Array<BranchDetails>;
+  /** Whether the stack is conflicted. */
+  isConflicted: boolean;
+};
+
+/**
+ * Represents a lightweight version of a [`Stack`] for listing.
+ * NOTE: this is a UI type mostly because it's still modeled after the legacy stack with StackId, something that doesn't exist anymore.
+ */
+export type StackEntry = {
+  /** The ID of the stack. */
+  id: string | null;
+  /**
+   * The list of the branch information that are part of the stack.
+   * The list is never empty.
+   * The first entry in the list is always the most recent branch on top the stack.
+   */
+  heads: Array<StackHeadInfo>;
+  /** The tip of the top-most branch, i.e., the most recent commit that would become the parent of new commits of the topmost stack branch. */
+  tip: string;
+  /** The zero-based index for sorting stacks. */
+  order: number | null;
+  /** If `true`, then any head in this stack is checked directly so `HEAD` points to it, and this is only ever `true` for a single stack. */
+  isCheckedOut: boolean;
+};
+
+/** The information about the branch inside a stack */
+export type StackHeadInfo = {
+  /** The name of the branch. */
+  name: string;
+  /** The tip of the branch. */
+  tip: string;
+  /** The associated forge review with this branch, e.g. GitHub PRs or GitLab MRs */
+  reviewId: number | null;
+  /**
+   * If `true`, then this head is checked directly so `HEAD` points to it, and this is only ever `true` for a single head.
+   * This is `false` if the worktree is checked out.
+   */
+  isCheckedOut: boolean;
+};
+
+/** Represents the order of series (branches) and changes (commits) in a stack. */
+export type StackOrder = {
+  /** The series are ordered from newest to oldest (most recent stacks go first) */
+  series: Array<SeriesOrder>;
+};
+
 /** Represents a reference to an associated virtual branch */
 export type StackReference = {
   /** A non-normalized name of the branch, set by the user */
@@ -1385,12 +1967,43 @@ export type StackReference = {
   pullRequests: Record<string, number>;
 };
 
+export type StackStatus = {
+  treeStatus: UpstreamTreeStatus;
+  branchStatuses: Array<NameAndStatus>;
+};
+
+export type StackStatuses = {
+  type: "upToDate";
+} | {
+  type: "updatesRequired";
+  subject: {
+    worktreeConflicts: Array<string>;
+    statuses: Array<[string | null, StackStatus]>;
+  };
+};
+
 /** Information about the target reference, the one we want to integrate with. */
 export type Target = {
   /** The remote tracking branch of the target to integrate with, like `refs/remotes/origin/main`. */
   remoteTrackingRef: RemoteTrackingReference;
   /** The amount of commits that aren't reachable by any segment in the workspace, they are in its future. */
   commitsAhead: number;
+};
+
+export type TelemetrySettings = {
+  /** Whether the anonymous metrics are enabled. */
+  appMetricsEnabled: boolean;
+  /** Whether anonymous error reporting is enabled. */
+  appErrorReportingEnabled: boolean;
+  /** Whether non-anonymous metrics are enabled. */
+  appNonAnonMetricsEnabled: boolean;
+  /** Distinct ID, if reporting is enabled. */
+  appDistinctId: string | null;
+  /**
+   * Whether settings have been migrated from the legacy Tauri store.
+   * This flag is set to true after the one-time migration and prevents repeated migration attempts.
+   */
+  migratedFromLegacy: boolean;
 };
 
 export type TreeChange = {
@@ -1433,7 +2046,7 @@ export type TreeStatus = {
   subject: {
     previousState: ChangeState;
     state: ChangeState;
-    flags?: ModeFlags | null;
+    flags: ModeFlags | null;
   };
 } | {
   type: "Rename";
@@ -1443,8 +2056,26 @@ export type TreeStatus = {
     previousPathBytes: Array<number>;
     previousState: ChangeState;
     state: ChangeState;
-    flags?: ModeFlags | null;
+    flags: ModeFlags | null;
   };
+};
+
+export type UiSettings = {
+  /** Whether to use the native system title bar. */
+  useNativeTitleBar: boolean;
+  /**
+   * Whether the `but` CLI is managed by a package manager.
+   * When true, the UI should show a specific message instead of installation options.
+   */
+  cliIsManagedByPackageManager: boolean;
+  /**
+   * **LEGACY**: The duration between UI update checks in seconds. If `0`, no update checks will be performed.
+   * This setting controls Tauri's built-in update mechanism for the desktop application.
+   *
+   * **DEPRECATED**: This field is legacy and will be replaced by the top-level `appUpdatesCheckIntervalSec` setting.
+   * New code should use `appUpdatesCheckIntervalSec` instead, which will control update checks for both CLI and GUI.
+   */
+  checkForUpdatesIntervalInSeconds: number;
 };
 
 /**
@@ -1491,6 +2122,14 @@ export type UpstreamCommit = {
   author: Author;
 };
 
+export type UpstreamTreeStatus = {
+  type: "safelyUpdatable";
+} | {
+  type: "conflicted";
+} | {
+  type: "empty";
+};
+
 /** Git files activity. Supplies the head sha */
 export type WatcherGitActivityPayload = {
   /** The SHA of the repository's HEAD. */
@@ -1534,10 +2173,10 @@ export type WorktreeChanges = {
   /** Changes that could be committed. */
   changes: Array<TreeChange>;
   /** Changes that were in the index that we can't handle. The user can see them and interact with them to clear them out before a commit can be made. */
-  ignored_changes: Array<IgnoredWorktreeChange>;
+  ignoredChanges: Array<IgnoredWorktreeChange>;
   assignments: Array<HunkAssignment>;
   assignmentsError: SerdeError | null;
-  dependencies?: HunkDependencies | null;
+  dependencies: HunkDependencies | null;
   dependenciesError: SerdeError | null;
 };
 

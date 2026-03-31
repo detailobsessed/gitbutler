@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use but_forge::ForgeReview;
 use gitbutler_branch::BranchCreateRequest;
-use gitbutler_branch_actions::upstream_integration::{BranchStatus, StackStatuses, TreeStatus};
+use gitbutler_branch_actions::upstream_integration::{
+    BranchStatus, StackStatuses, UpstreamTreeStatus,
+};
 use gitbutler_reference::Refname;
 
 use super::*;
@@ -184,12 +186,12 @@ fn upstream_integration_status_without_review_map() {
         } => {
             assert_eq!(statuses.len(), 1);
             assert_eq!(statuses[0].0, Some(stack_id));
-            assert_eq!(statuses[0].1.tree_status, TreeStatus::Empty);
+            assert_eq!(statuses[0].1.tree_status, UpstreamTreeStatus::Empty);
             assert_eq!(statuses[0].1.branch_statuses.len(), 1);
             assert_eq!(statuses[0].1.branch_statuses[0].name, "feature-branch");
             assert_eq!(
                 statuses[0].1.branch_statuses[0].status,
-                BranchStatus::SaflyUpdatable
+                BranchStatus::SafelyUpdatable
             );
             assert!(worktree_conflicts.is_empty());
         }
@@ -281,7 +283,7 @@ fn upstream_integration_status_with_merged_pr() {
         } => {
             assert_eq!(statuses.len(), 1);
             assert_eq!(statuses[0].0, Some(stack_id));
-            assert_eq!(statuses[0].1.tree_status, TreeStatus::Empty);
+            assert_eq!(statuses[0].1.tree_status, UpstreamTreeStatus::Empty);
             assert_eq!(statuses[0].1.branch_statuses.len(), 1);
             assert_eq!(statuses[0].1.branch_statuses[0].name, "feature-branch");
             assert_eq!(
@@ -378,12 +380,12 @@ fn upstream_integration_status_with_merged_pr_mismatched_head() {
         } => {
             assert_eq!(statuses.len(), 1);
             assert_eq!(statuses[0].0, Some(stack_id));
-            assert_eq!(statuses[0].1.tree_status, TreeStatus::Empty);
+            assert_eq!(statuses[0].1.tree_status, UpstreamTreeStatus::Empty);
             assert_eq!(statuses[0].1.branch_statuses.len(), 1);
             assert_eq!(statuses[0].1.branch_statuses[0].name, "feature-branch");
             assert_eq!(
                 statuses[0].1.branch_statuses[0].status,
-                BranchStatus::SaflyUpdatable
+                BranchStatus::SafelyUpdatable
             );
             assert!(worktree_conflicts.is_empty());
         }
@@ -475,12 +477,12 @@ fn upstream_integration_status_with_closed_but_not_merged_pr() {
         } => {
             assert_eq!(statuses.len(), 1);
             assert_eq!(statuses[0].0, Some(stack_id));
-            assert_eq!(statuses[0].1.tree_status, TreeStatus::Empty);
+            assert_eq!(statuses[0].1.tree_status, UpstreamTreeStatus::Empty);
             assert_eq!(statuses[0].1.branch_statuses.len(), 1);
             assert_eq!(statuses[0].1.branch_statuses[0].name, "feature-branch");
             assert_eq!(
                 statuses[0].1.branch_statuses[0].status,
-                BranchStatus::SaflyUpdatable
+                BranchStatus::SafelyUpdatable
             );
             assert!(worktree_conflicts.is_empty());
         }
@@ -572,12 +574,12 @@ fn upstream_integration_status_with_different_branch_pr() {
         } => {
             assert_eq!(statuses.len(), 1);
             assert_eq!(statuses[0].0, Some(stack_id));
-            assert_eq!(statuses[0].1.tree_status, TreeStatus::Empty);
+            assert_eq!(statuses[0].1.tree_status, UpstreamTreeStatus::Empty);
             assert_eq!(statuses[0].1.branch_statuses.len(), 1);
             assert_eq!(statuses[0].1.branch_statuses[0].name, "feature-branch");
             assert_eq!(
                 statuses[0].1.branch_statuses[0].status,
-                BranchStatus::SaflyUpdatable
+                BranchStatus::SafelyUpdatable
             );
             assert!(worktree_conflicts.is_empty());
         }
