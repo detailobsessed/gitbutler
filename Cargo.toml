@@ -300,6 +300,7 @@ self_cell = "1.2.2"
 unicode-segmentation = "1.12.0"
 urlencoding = "2.1"
 inventory = "0.3"
+bimap = "=0.6.3"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
