@@ -828,6 +828,7 @@ dependencies = [
  "but-rules",
  "but-secret",
  "but-serde",
+ "but-server",
  "but-settings",
  "but-testsupport",
  "but-tools",
