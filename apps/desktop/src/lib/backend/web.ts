@@ -315,8 +315,9 @@ export function getApiBaseUrl(): string {
 
 /**
  * Returns the WebSocket URL for the event stream.
- * Derived from `getApiBaseUrl()` — replaces http(s) with ws(s) and
- * points at `/ws` on the same host (without any `/api` prefix).
+ * Derived from `getApiBaseUrl()` — replaces http(s) with ws(s) and appends
+ * `/ws` under the same base path as API calls (e.g. `/api/ws` when the base
+ * is `/api`, or `wss://tunnel.example.com/api/ws` for an absolute base).
  */
 function getWsUrl(): string {
 	const base = getApiBaseUrl();

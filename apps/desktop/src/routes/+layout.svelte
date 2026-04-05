@@ -172,7 +172,6 @@
 <div class="app-root" role="application" oncontextmenu={(e) => !dev && e.preventDefault()}>
 	{@render children()}
 </div>
-<ShareIssueModal />
 <ToastController />
 <ChipToastContainer />
 <AppUpdater />

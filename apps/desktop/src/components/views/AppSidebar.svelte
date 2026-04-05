@@ -326,7 +326,7 @@
 	</ContextMenuSection>
 </ContextMenu>
 
-<ShareIssueModal bind:this={shareIssueModal} />
+<ShareIssueModal bind:this={shareIssueModal} {projectId} />
 
 <style lang="postcss">
 	.sidebar {

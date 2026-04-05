@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { page } from "$app/stores";
 	import { BACKEND } from "$lib/backend";
 	import { FILE_SERVICE } from "$lib/files/fileService";
 	import { GIT_SERVICE } from "$lib/git/gitService";
@@ -10,6 +9,12 @@
 	import { HTTP_CLIENT } from "@gitbutler/shared/network/httpClient";
 
 	import { Button, Checkbox, Modal, Textarea, EmailTextbox, chipToasts } from "@gitbutler/ui";
+
+	type Props = {
+		projectId: string;
+	};
+
+	const { projectId }: Props = $props();
 
 	type Feedback = {
 		id: number;
@@ -33,6 +38,7 @@
 	}
 
 	async function gitIndexLength() {
+		if (!projectId) return 0;
 		return await gitService.indexSize(projectId);
 	}
 
@@ -43,8 +49,6 @@
 	let sendLogs = $state(false);
 	let sendProjectRepository = $state(false);
 	let sendGraph = $state(false);
-
-	const projectId = $derived($page.params.projectId!);
 
 	function reset() {
 		messageInputValue = "";
@@ -81,12 +85,12 @@
 				sendLogs
 					? dataSharingService.logs().then(async (path) => await readZipFile(path, "logs.zip"))
 					: undefined,
-				sendProjectRepository
+				sendProjectRepository && projectId
 					? dataSharingService
 							.projectData(projectId)
 							.then(async (path) => await readZipFile(path, "project.zip"))
 					: undefined,
-				sendGraph
+				sendGraph && projectId
 					? dataSharingService
 							.graphFile(projectId)
 							.then(async (path) => await readZipFile(path, "graph.zip"))
