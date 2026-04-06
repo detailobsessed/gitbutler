@@ -293,13 +293,18 @@ class WebListener {
  * Returns the base URL for API calls (without trailing slash).
  *
  * Resolution order:
- * 1. `VITE_BUTLER_API_BASE_URL` — full base URL (e.g. `http://localhost:6978`)
- * 2. `VITE_BUTLER_HOST` + `VITE_BUTLER_PORT` — legacy host/port env vars
- * 3. `` — empty string (same origin, no prefix). When running with `--tunnel`,
- *    the server auto-sets `--base-path=/api` so `VITE_BUTLER_API_BASE_URL`
- *    should be set to `/api` if needed.
+ * 1. `<meta name="gitbutler-server-base">` — injected at runtime by but-server into
+ *    the served index.html. Takes priority so the server can override the baked-in
+ *    build value (e.g. empty string for --local mode vs /api for tunnel mode).
+ *    Note: `gitbutler-api-url` is a separate tag for the GitButler web API (app.gitbutler.com).
+ * 2. `VITE_BUTLER_API_BASE_URL` — build-time env var (e.g. `http://localhost:6978`)
+ * 3. `VITE_BUTLER_HOST` + `VITE_BUTLER_PORT` — legacy host/port env vars
+ * 4. `` — empty string (same origin, no prefix)
  */
 export function getApiBaseUrl(): string {
+	const meta = document.querySelector<HTMLMetaElement>('meta[name="gitbutler-server-base"]');
+	if (meta !== null) return meta.content.replace(/\/$/, "");
+
 	const base = import.meta.env.VITE_BUTLER_API_BASE_URL;
 	if (base) return base.replace(/\/$/, "");
 

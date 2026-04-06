@@ -14,7 +14,6 @@
 	import FocusCursor from "$components/shared/FocusCursor.svelte";
 	import GitInputPrompt from "$components/shared/GitInputPrompt.svelte";
 	import ReloadWarning from "$components/shared/ReloadWarning.svelte";
-	import ShareIssueModal from "$components/shared/ShareIssueModal.svelte";
 	import ToastController from "$components/shared/ToastController.svelte";
 	import GlobalModalRouter from "$components/views/GlobalModalRouter.svelte";
 	import { initDependencies } from "$lib/bootstrap/deps";

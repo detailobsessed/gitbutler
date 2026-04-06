@@ -42,15 +42,16 @@
 	import { reactive } from "@gitbutler/shared/reactiveUtils.svelte";
 	import { mergeUnlisten } from "@gitbutler/ui/utils/mergeUnlisten";
 	import { onDestroy, untrack, type Snippet } from "svelte";
-	import type { LayoutData } from "./$types";
 
-	const { data, children: pageChildren }: { data: LayoutData; children: Snippet } = $props();
+	const {
+		projectId,
+		projectPinned,
+		children: pageChildren,
+	}: { projectId: string; projectPinned: boolean; children: Snippet } = $props();
 
 	// =============================================================================
 	// PROJECT SETUP & CORE STATE
 	// =============================================================================
-
-	const { projectId, projectPinned } = $derived(data);
 
 	// Core services
 	const posthog = inject(POSTHOG_WRAPPER);
@@ -304,7 +305,7 @@
 
 	// Refresh on git fetch events
 	$effect(() =>
-		gitService.onFetch(data.projectId, () => {
+		gitService.onFetch(projectId, () => {
 			debouncedBaseBranchRefresh();
 			debouncedRemoteBranchRefresh();
 		}),

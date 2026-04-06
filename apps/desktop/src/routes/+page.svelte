@@ -10,7 +10,8 @@
 	const projectsService = inject(PROJECTS_SERVICE);
 	const pinnedId = $derived(data.pinnedProjectId);
 
-	// When a project is pinned (remote access mode), go straight to /workspace.
+	// When a project is pinned (remote access mode), use the clean /workspace URL
+	// so the project handle is not exposed in the shared tunnel URL.
 	$effect(() => {
 		if (pinnedId) {
 			goto("/workspace", { replaceState: true });
@@ -35,10 +36,10 @@
 		if (projects === undefined) return { type: "loading" };
 		const projectId = projects.find((p) => p.id === persistedId)?.id;
 		if (projectId) {
-			return { type: "redirect", subject: `/${projectId}/workspace` };
+			return { type: "redirect", subject: `/p/${projectId}/workspace` };
 		}
 		if (projects.length > 0) {
-			return { type: "redirect", subject: `/${projects[0]?.id}/workspace` };
+			return { type: "redirect", subject: `/p/${projects[0]?.id}/workspace` };
 		}
 		return { type: "no-projects" };
 	});

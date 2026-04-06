@@ -6,6 +6,7 @@
 	import newZenSvg from "$lib/assets/illustrations/new-zen.svg?raw";
 	import { BASE_BRANCH_SERVICE } from "$lib/baseBranch/baseBranchService.svelte";
 	import { PROJECTS_SERVICE } from "$lib/project/projectsService";
+	import { projectPath } from "$lib/routes/routes.svelte";
 	import { OnboardingEvent, POSTHOG_WRAPPER } from "$lib/telemetry/posthog";
 	import { inject } from "@gitbutler/core/context";
 	import { TestId } from "@gitbutler/ui";
@@ -34,7 +35,7 @@
 				pushRemote: branch[1],
 			});
 			posthog.captureOnboarding(OnboardingEvent.SetTargetBranch);
-			goto(`/${projectId}/`, { invalidateAll: true });
+			goto(projectPath(projectId), { invalidateAll: true });
 		} catch (e: unknown) {
 			posthog.captureOnboarding(OnboardingEvent.SetTargetBranchFailed, e);
 		}
