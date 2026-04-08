@@ -1,5 +1,11 @@
 import { setConfig } from "./config.ts";
-import { BUT_SERVER_PORT, BUT_TESTING, DESKTOP_PORT, GIT_CONFIG_GLOBAL } from "./env.ts";
+import {
+	BUT_SERVER,
+	BUT_SERVER_PORT,
+	BUT_TESTING,
+	DESKTOP_PORT,
+	GIT_CONFIG_GLOBAL,
+} from "./env.ts";
 import { type BrowserContext } from "@playwright/test";
 import { ChildProcess, spawn } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
@@ -91,7 +97,46 @@ class GitButlerManager implements GitButler {
 
 	async destroy() {
 		log("Stopping GitButler...");
-		this.butServerProcess.kill("SIGTERM");
+		await new Promise<void>((resolve) => {
+			if (this.butServerProcess.exitCode !== null || this.butServerProcess.signalCode !== null) {
+				resolve();
+				return;
+			}
+
+			const shutdownTimeoutMs = 5000;
+			let settled = false;
+
+			const finish = () => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(forceKillTimer);
+				resolve();
+			};
+
+			this.butServerProcess.once("close", finish);
+
+			const forceKillTimer = setTimeout(() => {
+				if (settled) return;
+				log(`but-server did not stop after ${shutdownTimeoutMs}ms, sending SIGKILL...`, colors.red);
+				try {
+					const killed = this.butServerProcess.kill("SIGKILL");
+					if (!killed) {
+						finish();
+					}
+				} catch {
+					finish();
+				}
+			}, shutdownTimeoutMs);
+
+			try {
+				const killed = this.butServerProcess.kill("SIGTERM");
+				if (!killed) {
+					finish();
+				}
+			} catch {
+				finish();
+			}
+		});
 	}
 
 	pathInWorkdir(...filePathSegments: string[]): string {
@@ -120,9 +165,9 @@ class GitButlerManager implements GitButler {
 }
 
 function createButServerProcess(rootDir: string, serverEnv: Record<string, string>): ChildProcess {
-	const child = spawn("cargo", ["run", "-p", "but-server"], {
+	const child = spawn(BUT_SERVER, ["--port", serverEnv.BUTLER_PORT], {
 		cwd: rootDir,
-		stdio: "pipe",
+		stdio: ["ignore", "pipe", "pipe"],
 		env: {
 			...process.env,
 			...serverEnv,

@@ -10,7 +10,7 @@ import path from "node:path";
 // import path from 'path';
 // dotenv.config({ path: path.resolve(__dirname, '.env') });
 
-const AMOUNT_OF_WORKERS = process.env.CI ? 1 : 4;
+const AMOUNT_OF_WORKERS = process.env.CI ? 2 : 4;
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -23,7 +23,7 @@ export default defineConfig({
 	forbidOnly: !!process.env.CI,
 	/* Retry on CI only */
 	retries: process.env.CI ? 2 : 0,
-	/* Opt out of parallel tests on CI. */
+	/* Limit parallelism on CI to 2 workers. */
 	workers: AMOUNT_OF_WORKERS,
 	/* Reporter to use. See https://playwright.dev/docs/test-reporters */
 	reporter: process.env.CI ? "github" : "list",
