@@ -476,7 +476,7 @@ pub fn assign_hunks_post_tool_call(
             hunk_header: a.hunk_header,
             path_bytes: a.path_bytes,
             stack_id: Some(stack_id),
-            branch_ref_bytes: None,
+            branch_ref_bytes: a.branch_ref_bytes,
         })
         .collect();
 

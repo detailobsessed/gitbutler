@@ -75,14 +75,13 @@ fn savepoint_read_snapshot_stays_consistent_across_tables_with_interleaved_write
     but_db::migration::run(&mut db2, but_db::migration::ours())?;
 
     db1.execute(
-        "INSERT INTO hunk_assignments (id, hunk_header, path, path_bytes, stack_id)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO hunk_assignments (id, hunk_header, path, path_bytes)
+         VALUES (?1, ?2, ?3, ?4)",
         rusqlite::params![
             "id-1",
             "@@ -1,1 +1,1 @@",
             "path/to/file",
             b"path/to/file".to_vec(),
-            Option::<String>::None,
         ],
     )?;
 

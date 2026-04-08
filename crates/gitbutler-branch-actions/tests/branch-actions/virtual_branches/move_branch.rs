@@ -1,8 +1,7 @@
-use crate::support::stack_details;
 use bstr::ByteSlice;
 use gitbutler_branch::BranchCreateRequest;
 
-use super::{Test, create_commit};
+use super::{Test, create_commit, stack_details};
 
 /// Move a branch that has no dependencies on commits remaining in the source
 /// stack. The source stack is left empty and deleted; the destination gains

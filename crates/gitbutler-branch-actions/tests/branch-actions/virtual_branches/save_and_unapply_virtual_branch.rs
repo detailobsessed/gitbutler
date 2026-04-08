@@ -44,7 +44,7 @@ fn unapply_with_data() -> anyhow::Result<()> {
         hunk_header: assignments[0].hunk_header,
         path_bytes: assignments[0].path_bytes.clone(),
         stack_id: Some(stacks[0].0),
-        branch_ref_bytes: None,
+        branch_ref_bytes: assignments[0].branch_ref_bytes.clone(),
     };
     but_hunk_assignment::assign(
         db.hunk_assignments_mut()?,

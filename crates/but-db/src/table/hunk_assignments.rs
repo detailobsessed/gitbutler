@@ -32,6 +32,8 @@ pub(crate) const M: &[M<'static>] = &[
         SchemaVersion::Zero,
         "ALTER TABLE `hunk_assignments` ADD COLUMN `branch_ref` BINARY;",
     ),
+    // Note: stack_id column is kept for backward compatibility with older data.
+    // It is no longer written to, but is read as a fallback when branch_ref is NULL.
 ];
 
 /// Tests are in `but-db/tests/db/table/hunk_assignments.rs`.
@@ -41,6 +43,8 @@ pub struct HunkAssignment {
     pub hunk_header: Option<String>,
     pub path: String,
     pub path_bytes: Vec<u8>,
+    /// Deprecated: kept for backward compatibility with pre-branch_ref data.
+    /// No longer written to. Read as fallback when `branch_ref_bytes` is NULL.
     pub stack_id: Option<String>,
     pub branch_ref_bytes: Option<Vec<u8>>,
 }
@@ -79,6 +83,7 @@ pub struct HunkAssignmentsHandleMut<'conn> {
 
 impl HunkAssignmentsHandle<'_> {
     /// Lists all hunk assignments in the database.
+    /// Reads `stack_id` as a fallback for pre-branch_ref data.
     pub fn list_all(&self) -> rusqlite::Result<Vec<HunkAssignment>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, hunk_header, path, path_bytes, stack_id, branch_ref FROM hunk_assignments",
@@ -107,19 +112,19 @@ impl HunkAssignmentsHandleMut<'_> {
 
     /// Sets the hunk assignments table to the provided values.
     /// Any existing entries that are not in the provided values are deleted.
+    /// Note: stack_id is no longer written — branch_ref is the source of truth.
     pub fn set_all(self, assignments: Vec<HunkAssignment>) -> rusqlite::Result<()> {
         self.sp.execute("DELETE FROM hunk_assignments", [])?;
 
         for assignment in assignments {
             self.sp.execute(
-                "INSERT INTO hunk_assignments (id, hunk_header, path, path_bytes, stack_id, branch_ref) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                "INSERT INTO hunk_assignments (id, hunk_header, path, path_bytes, branch_ref) \
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
                 rusqlite::params![
                     assignment.id,
                     assignment.hunk_header,
                     assignment.path,
                     assignment.path_bytes,
-                    assignment.stack_id,
                     assignment.branch_ref_bytes,
                 ],
             )?;

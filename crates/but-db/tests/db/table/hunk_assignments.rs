@@ -6,27 +6,9 @@ use crate::table::in_memory_db;
 fn insert_and_read() -> anyhow::Result<()> {
     let mut db = in_memory_db();
 
-    let hunk1 = hunk_assignment(
-        "id1",
-        Some("@@ -1,3 +1,4 @@"),
-        "path/to/file.txt",
-        Some("stack1"),
-        None,
-    );
-    let hunk2 = hunk_assignment(
-        "id2",
-        Some("@@ -10,5 +11,6 @@"),
-        "path/to/file.txt",
-        Some("stack1"),
-        None,
-    );
-    let hunk3 = hunk_assignment(
-        "id3",
-        Some("@@ -20,2 +21,3 @@"),
-        "path/to/other.txt",
-        Some("stack2"),
-        None,
-    );
+    let hunk1 = hunk_assignment("id1", Some("@@ -1,3 +1,4 @@"), "path/to/file.txt", None);
+    let hunk2 = hunk_assignment("id2", Some("@@ -10,5 +11,6 @@"), "path/to/file.txt", None);
+    let hunk3 = hunk_assignment("id3", Some("@@ -20,2 +21,3 @@"), "path/to/other.txt", None);
 
     db.hunk_assignments_mut()?
         .set_all(vec![hunk1.clone(), hunk2.clone(), hunk3.clone()])?;
@@ -44,27 +26,9 @@ fn insert_and_read() -> anyhow::Result<()> {
 fn set_all_replaces_existing() -> anyhow::Result<()> {
     let mut db = in_memory_db();
 
-    let hunk1 = hunk_assignment(
-        "id1",
-        Some("@@ -1,3 +1,4 @@"),
-        "path/to/file.txt",
-        Some("stack1"),
-        None,
-    );
-    let hunk2 = hunk_assignment(
-        "id2",
-        Some("@@ -10,5 +11,6 @@"),
-        "path/to/file.txt",
-        Some("stack1"),
-        None,
-    );
-    let hunk3 = hunk_assignment(
-        "id3",
-        Some("@@ -1,3 +1,4 @@"),
-        "different.txt",
-        Some("stack2"),
-        None,
-    );
+    let hunk1 = hunk_assignment("id1", Some("@@ -1,3 +1,4 @@"), "path/to/file.txt", None);
+    let hunk2 = hunk_assignment("id2", Some("@@ -10,5 +11,6 @@"), "path/to/file.txt", None);
+    let hunk3 = hunk_assignment("id3", Some("@@ -1,3 +1,4 @@"), "different.txt", None);
 
     db.hunk_assignments_mut()?
         .set_all(vec![hunk1.clone(), hunk2.clone()])?;
@@ -90,27 +54,9 @@ fn set_all_replaces_existing_with_outer_transaction_and_rollback() -> anyhow::Re
     let assignments = trans.hunk_assignments().list_all()?;
     assert!(assignments.is_empty(), "it starts out empty");
 
-    let hunk1 = hunk_assignment(
-        "id1",
-        Some("@@ -1,3 +1,4 @@"),
-        "path/to/file.txt",
-        Some("stack1"),
-        None,
-    );
-    let hunk2 = hunk_assignment(
-        "id2",
-        Some("@@ -10,5 +11,6 @@"),
-        "path/to/file.txt",
-        Some("stack1"),
-        None,
-    );
-    let hunk3 = hunk_assignment(
-        "id3",
-        Some("@@ -1,3 +1,4 @@"),
-        "different.txt",
-        Some("stack2"),
-        None,
-    );
+    let hunk1 = hunk_assignment("id1", Some("@@ -1,3 +1,4 @@"), "path/to/file.txt", None);
+    let hunk2 = hunk_assignment("id2", Some("@@ -10,5 +11,6 @@"), "path/to/file.txt", None);
+    let hunk3 = hunk_assignment("id3", Some("@@ -1,3 +1,4 @@"), "different.txt", None);
 
     trans
         .hunk_assignments_mut()?
@@ -137,13 +83,7 @@ fn set_all_replaces_existing_with_outer_transaction_and_rollback() -> anyhow::Re
 fn set_empty_clears_the_table() -> anyhow::Result<()> {
     let mut db = in_memory_db();
 
-    let hunk1 = hunk_assignment(
-        "id1",
-        Some("@@ -1,3 +1,4 @@"),
-        "path/to/file.txt",
-        Some("stack1"),
-        None,
-    );
+    let hunk1 = hunk_assignment("id1", Some("@@ -1,3 +1,4 @@"), "path/to/file.txt", None);
 
     db.hunk_assignments_mut()?.set_all(vec![hunk1])?;
 
@@ -167,11 +107,11 @@ fn optional_fields() -> anyhow::Result<()> {
         hunk_header: None,
         path: "path/to/file.txt".to_string(),
         path_bytes: b"path/to/file.txt".to_vec(),
-        stack_id: Some("stack1".to_string()),
+        stack_id: None,
         branch_ref_bytes: None,
     };
 
-    let hunk_no_stack = HunkAssignment {
+    let hunk_no_branch = HunkAssignment {
         id: Some("id2".to_string()),
         hunk_header: Some("@@ -1,3 +1,4 @@".to_string()),
         path: "path/to/other.txt".to_string(),
@@ -185,20 +125,20 @@ fn optional_fields() -> anyhow::Result<()> {
         hunk_header: Some("@@ -10,5 +11,6 @@".to_string()),
         path: "path/to/third.txt".to_string(),
         path_bytes: b"path/to/third.txt".to_vec(),
-        stack_id: Some("stack2".to_string()),
+        stack_id: None,
         branch_ref_bytes: None,
     };
 
     db.hunk_assignments_mut()?.set_all(vec![
         hunk_no_header.clone(),
-        hunk_no_stack.clone(),
+        hunk_no_branch.clone(),
         hunk_no_id.clone(),
     ])?;
 
     let assignments = db.hunk_assignments().list_all()?;
     assert_eq!(assignments.len(), 3);
     assert!(assignments.contains(&hunk_no_header));
-    assert!(assignments.contains(&hunk_no_stack));
+    assert!(assignments.contains(&hunk_no_branch));
     assert!(assignments.contains(&hunk_no_id));
 
     Ok(())
@@ -213,7 +153,7 @@ fn non_utf8_path_bytes() -> anyhow::Result<()> {
         hunk_header: Some("@@ -1,3 +1,4 @@".to_string()),
         path: "valid/path.txt".to_string(),
         path_bytes: vec![0xFF, 0xFE, 0xFD, 0x00, 0x80],
-        stack_id: Some("stack1".to_string()),
+        stack_id: None,
         branch_ref_bytes: None,
     };
 
@@ -239,16 +179,10 @@ fn branch_ref_bytes_roundtrip() -> anyhow::Result<()> {
         "id1",
         Some("@@ -1,3 +1,4 @@"),
         "path/to/file.txt",
-        Some("stack1"),
         Some("refs/heads/feature"),
     );
-    let hunk_without_branch = hunk_assignment(
-        "id2",
-        Some("@@ -10,5 +11,6 @@"),
-        "path/to/file.txt",
-        Some("stack1"),
-        None,
-    );
+    let hunk_without_branch =
+        hunk_assignment("id2", Some("@@ -10,5 +11,6 @@"), "path/to/file.txt", None);
 
     db.hunk_assignments_mut()?
         .set_all(vec![hunk_with_branch.clone(), hunk_without_branch.clone()])?;
@@ -276,11 +210,53 @@ fn branch_ref_bytes_roundtrip() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Verifies that rows with only `stack_id` set (pre-Phase-1 data) are read correctly.
+/// The `stack_id` column is no longer written by `set_all()`, but `list_all()` must
+/// still read it as a fallback for legacy data.
+#[test]
+fn legacy_stack_id_fallback() -> anyhow::Result<()> {
+    // Use a temp file DB so we can insert legacy data via raw SQL, then reopen via DbHandle.
+    let tmp = tempfile::tempdir()?;
+    let db_path = tmp.path().join("test.db");
+
+    // Insert legacy data with stack_id but no branch_ref via raw connection.
+    {
+        let mut conn = rusqlite::Connection::open(&db_path)?;
+        but_db::migration::run(&mut conn, but_db::migration::ours())?;
+        conn.execute(
+            "INSERT INTO hunk_assignments (id, hunk_header, path, path_bytes, stack_id) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![
+                "legacy-id",
+                "@@ -1,3 +1,4 @@",
+                "legacy/file.txt",
+                b"legacy/file.txt".to_vec(),
+                "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            ],
+        )?;
+    }
+
+    // Reopen via DbHandle and verify list_all reads the legacy stack_id.
+    let db = but_db::DbHandle::new_at_path(&db_path)?;
+    let assignments = db.hunk_assignments().list_all()?;
+    assert_eq!(assignments.len(), 1);
+    assert_eq!(
+        assignments[0].stack_id.as_deref(),
+        Some("a1b2c3d4-e5f6-7890-abcd-ef1234567890"),
+        "legacy stack_id should be readable from DB"
+    );
+    assert_eq!(
+        assignments[0].branch_ref_bytes, None,
+        "branch_ref should be NULL for legacy data"
+    );
+
+    Ok(())
+}
+
 fn hunk_assignment(
     id: &str,
     hunk_header: Option<&str>,
     path: &str,
-    stack_id: Option<&str>,
     branch_ref_bytes: Option<&str>,
 ) -> HunkAssignment {
     HunkAssignment {
@@ -288,7 +264,7 @@ fn hunk_assignment(
         hunk_header: hunk_header.map(String::from),
         path: path.to_string(),
         path_bytes: path.as_bytes().to_vec(),
-        stack_id: stack_id.map(String::from),
+        stack_id: None,
         branch_ref_bytes: branch_ref_bytes.map(|s| s.as_bytes().to_vec()),
     }
 }

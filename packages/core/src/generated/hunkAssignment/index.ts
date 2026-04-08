@@ -54,7 +54,8 @@ export type HunkAssignment = {
 	 */
 	pathBytes: number[];
 	/**
-	 * The stack to which the hunk is assigned. If None, the hunk is not assigned to any stack.
+	 * The stack to which the hunk is assigned (derived from `branch_ref_bytes` via workspace projection).
+	 * Not persisted in DB — computed during reconciliation. Still sent over the wire for client compatibility.
 	 */
 	stackId: string | null;
 	/**

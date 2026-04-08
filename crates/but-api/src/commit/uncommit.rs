@@ -84,6 +84,7 @@ pub fn commit_uncommit_changes_only_with_perm(
             .filter_map(|assignment| assignment.id)
             .collect();
 
+        // stack_id on the request will be resolved to branch_ref_bytes in requests_to_assignments()
         let to_assign: Vec<_> = after_assignments
             .into_iter()
             .filter(|assignment| assignment.id.is_some_and(|id| !before_ids.contains(&id)))
@@ -91,7 +92,7 @@ pub fn commit_uncommit_changes_only_with_perm(
                 hunk_header: assignment.hunk_header,
                 path_bytes: assignment.path_bytes,
                 stack_id: Some(stack_id),
-                branch_ref_bytes: None,
+                branch_ref_bytes: assignment.branch_ref_bytes,
             })
             .collect();
 

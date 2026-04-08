@@ -949,7 +949,10 @@ export type HunkAssignment = {
   path: string;
   /** The file path of the hunk in bytes. */
   pathBytes: Array<number>;
-  /** The stack to which the hunk is assigned. If None, the hunk is not assigned to any stack. */
+  /**
+   * The stack to which the hunk is assigned (derived from `branch_ref_bytes` via workspace projection).
+   * Not persisted in DB — computed during reconciliation. Still sent over the wire for client compatibility.
+   */
   stackId: string | null;
   /**
    * The branch within the stack, as a full ref name (e.g. `refs/heads/my-branch`).
@@ -977,14 +980,16 @@ export type HunkAssignmentRequest = {
   /** The file path of the hunk in bytes. */
   pathBytes: Array<number>;
   /**
-   * The stack to which the hunk is assigned. If set to None, the hunk is set as "unassigned".
-   * If a stack id is set, it must be one of the applied stacks.
+   * Deprecated: use `branch_ref_bytes` instead.
+   * Kept for backward compatibility with clients that haven't migrated yet.
+   * If `branch_ref_bytes` is also set, it takes precedence.
    */
   stackId: string | null;
   /**
-   * Optional: target a specific branch within the stack, as a full ref name.
+   * The branch to which the hunk is assigned, as a full ref name.
    * Serialized as bytes over the wire for non-UTF-8 safety.
-   * If not provided, auto-resolves to the topmost branch.
+   * Takes precedence over `stack_id` when both are provided.
+   * If neither is provided, the hunk is unassigned.
    */
   branchRefBytes: Array<number> | null;
 };

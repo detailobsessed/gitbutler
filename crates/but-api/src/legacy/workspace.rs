@@ -593,6 +593,7 @@ pub fn uncommit_changes(
 
     if let (Some(before_assignments), Some(stack_id)) = (before_assignments, assign_to) {
         let (repo, ws, mut db) = ctx.workspace_and_db_mut_with_perm(guard.read_permission())?;
+
         let (after_assignments, _) = but_hunk_assignment::assignments_with_fallback(
             db.hunk_assignments_mut()?,
             &repo,
@@ -606,6 +607,7 @@ pub fn uncommit_changes(
             .filter_map(|a| a.id)
             .collect::<HashSet<_>>();
 
+        // stack_id on the request will be resolved to branch_ref_bytes in requests_to_assignments()
         let to_assign = after_assignments
             .into_iter()
             .filter(|a| a.id.is_some_and(|id| !before_assignments.contains(&id)))
@@ -613,7 +615,7 @@ pub fn uncommit_changes(
                 hunk_header: a.hunk_header,
                 path_bytes: a.path_bytes,
                 stack_id: Some(stack_id),
-                branch_ref_bytes: None,
+                branch_ref_bytes: a.branch_ref_bytes,
             })
             .collect::<Vec<_>>();
 
