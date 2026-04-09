@@ -310,17 +310,33 @@ where
         .map_err(Error::<E>::Exec)
 }
 
+/// Resolve a command to be set in GIT_SSH_COMMAND. We need to use GIT_SSH_COMMAND specifically as
+/// we add command line options.
+///
+/// It's important that the resolved command respects the requirements of GIT_SSH and
+/// GIT_SSH_COMMAND, see [the Git docs](https://git-scm.com/docs/git#Documentation/git.txt-GITSSH)
+/// for details.
 fn resolve_git_ssh_command<P>(harness_env: &HarnessEnv<P>, envs: &HashMap<String, String>) -> String
 where
     P: AsRef<Path>,
 {
-    let base_ssh_command = match envs
-        .get("GIT_SSH_COMMAND")
-        .cloned()
-        .or_else(|| envs.get("GIT_SSH").cloned())
-        .or_else(|| std::env::var("GIT_SSH_COMMAND").ok())
-        .or_else(|| std::env::var("GIT_SSH").ok())
-    {
+    let configured_command = {
+        // If we have either GIT_SSH_COMMAND or GIT_SSH in the programmatic envs, they take precedence.
+        let git_ssh_command_override = envs.get("GIT_SSH_COMMAND");
+        let git_ssh_override = envs.get("GIT_SSH");
+        if git_ssh_command_override.is_some() || git_ssh_override.is_some() {
+            resolve_git_ssh_command_from_env_values(git_ssh_command_override, git_ssh_override)
+        } else {
+            // Fall back on actual environment. Potentially move this environment resolution up the
+            // call stack to make this easier to test.
+            resolve_git_ssh_command_from_env_values(
+                std::env::var("GIT_SSH_COMMAND").ok(),
+                std::env::var("GIT_SSH").ok(),
+            )
+        }
+    };
+
+    let base_ssh_command = match configured_command {
         Some(v) => v,
         None => get_core_sshcommand(harness_env)
             .ok()
@@ -344,6 +360,29 @@ where
     format!(
         "{base_ssh_command} -o StrictHostKeyChecking=accept-new -o KbdInteractiveAuthentication=no{additional_options}"
     )
+}
+
+/// Resolve the GIT_SSH_COMMAND assuming that `git_ssh_command` and `git_ssh` are the values of the
+/// GIT_SSH_COMMAND and GIT_SSH, respectively.
+///
+/// This takes into consideration that GIT_SSH_COMMAND is an arbitrary shell command and therefore
+/// should _not_ be escaped, while GIT_SSH is always a path to a program and therefore _must_ be
+/// escaped.
+fn resolve_git_ssh_command_from_env_values<P: AsRef<str>>(
+    git_ssh_command: Option<P>,
+    git_ssh: Option<P>,
+) -> Option<String> {
+    match (git_ssh_command, git_ssh) {
+        (Some(git_ssh_command), _) => Some(git_ssh_command.as_ref().to_string()),
+        (_, Some(git_ssh)) => {
+            // Escape the path with single quotes so it's safe to execute by a POSIX shell.
+            //
+            // Even on Windows, Git uses a POSIX(ish) shell to execute GIT_SSH_COMMAND, see https://github.com/git/git/blob/b15384c06f77bc2d34d0d3623a8a58218313a561/run-command.c#L277-L286
+            let escaped_git_ssh = git_ssh.as_ref().replace("'", r"'\''");
+            Some(format!("'{escaped_git_ssh}'"))
+        }
+        (None, None) => None,
+    }
 }
 
 fn get_core_sshcommand<P>(harness_env: &HarnessEnv<P>) -> anyhow::Result<Option<String>>
@@ -580,5 +619,44 @@ where
             stdout,
             stderr,
         })?
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_git_ssh_command_from_env_values_prefers_git_ssh_command() {
+        let resolved =
+            resolve_git_ssh_command_from_env_values(Some("expected"), Some("not expected"));
+        assert_eq!(resolved, Some("expected".into()))
+    }
+
+    #[test]
+    fn test_resolve_git_ssh_command_from_env_values_falls_back_on_git_ssh() {
+        let resolved = resolve_git_ssh_command_from_env_values(None, Some("expected"));
+        assert_eq!(resolved, Some("'expected'".into()))
+    }
+
+    #[test]
+    fn test_resolve_git_ssh_command_from_env_values_does_not_escape_git_ssh_command() {
+        let resolved =
+            resolve_git_ssh_command_from_env_values(Some("/usr/bin/ssh --some-option"), None);
+        assert_eq!(resolved, Some("/usr/bin/ssh --some-option".into()))
+    }
+
+    #[test]
+    fn test_resolve_git_ssh_command_from_env_values_escapes_git_ssh() {
+        let resolved =
+            resolve_git_ssh_command_from_env_values(None, Some("/path that/needs'escaping"));
+        assert_eq!(resolved, Some(r"'/path that/needs'\''escaping'".into()))
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_resolve_git_ssh_command_from_env_values_rejects_expanding_shell_metacharacters() {
+        let resolved = resolve_git_ssh_command_from_env_values(None, Some(""));
+        assert_eq!(resolved, Some(r"'/path that/needs'\''escaping'".into()))
     }
 }
