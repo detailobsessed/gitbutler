@@ -146,14 +146,26 @@ fn checkout_edit_branch(ctx: &Context, commit_id: gix::ObjectId) -> Result<()> {
     let their_commit_msg = commit
         .message()
         .and_then(|m| m.lines().next())
-        .map(|l| l.chars().take(80).collect::<String>())
+        .map(|l| {
+            l.strip_prefix(but_core::commit::CONFLICT_MESSAGE_PREFIX)
+                .unwrap_or(l)
+                .chars()
+                .take(80)
+                .collect::<String>()
+        })
         .unwrap_or("".into());
     let their_label = format!("Current commit: {their_commit_msg}");
 
     let our_commit_msg = commit_parent
         .message()
         .and_then(|m| m.lines().next())
-        .map(|l| l.chars().take(80).collect::<String>())
+        .map(|l| {
+            l.strip_prefix(but_core::commit::CONFLICT_MESSAGE_PREFIX)
+                .unwrap_or(l)
+                .chars()
+                .take(80)
+                .collect::<String>()
+        })
         .unwrap_or("".into());
     let our_label = format!("New base: {our_commit_msg}");
 
@@ -269,7 +281,7 @@ pub(crate) fn save_and_return_to_workspace(ctx: &Context, perm: &mut RepoExclusi
     let new_commit_oid = if decoded_head_commit.tree() == tree_id {
         head_commit.id
     } else {
-        let commit = gix::objs::Commit::try_from(decoded_head_commit.clone())?;
+        let mut commit = gix::objs::Commit::try_from(decoded_head_commit.clone())?;
         let extra_headers: Vec<(BString, BString)> = Headers::try_from_commit(&commit)
             .map(|commit_headers| {
                 let headers = Headers {
@@ -279,6 +291,10 @@ pub(crate) fn save_and_return_to_workspace(ctx: &Context, perm: &mut RepoExclusi
                 (&headers).into()
             })
             .unwrap_or_default();
+        // Strip conflict markers only for genuinely conflicted commit messages.
+        if but_core::commit::message_is_conflicted(commit.message.as_ref()) {
+            commit.message = but_core::commit::strip_conflict_markers(commit.message.as_ref());
+        }
         but_rebase::commit::create(
             repo,
             gix::objs::Commit {

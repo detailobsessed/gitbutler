@@ -659,7 +659,12 @@ fn commit_data_id(c: &crate::ref_info::Commit) -> anyhow::Result<Identifier> {
     hasher.update(&offset.to_le_bytes());
 
     hasher.update(b"M");
-    hasher.update(c.message.as_slice());
+    // Trim trailing line endings before hashing so that messages differing
+    // only in trailing newlines still match.  This is needed because
+    // `strip_conflict_markers` may consume trailing newlines that the
+    // original message had; the remote copy retains them.
+    let msg = c.message.trim_end_with(|c| c == '\n' || c == '\r');
+    hasher.update(msg);
 
     Ok(Identifier::CommitData(hasher.try_finalize()?))
 }

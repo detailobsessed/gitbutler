@@ -651,8 +651,16 @@ impl TryFrom<&gix::Commit<'_>> for CommitData {
     type Error = anyhow::Error;
 
     fn try_from(commit: &gix::Commit<'_>) -> std::result::Result<Self, Self::Error> {
+        let raw_message: BString = commit.message_bstr().into();
+        let mut message = but_core::commit::strip_conflict_markers(raw_message.as_ref());
+        // Normalize trailing newlines so that messages differing only in a trailing
+        // newline still match (strip_conflict_markers may consume a trailing newline
+        // that the original message had).
+        while message.last() == Some(&b'\n') {
+            message.pop();
+        }
         Ok(CommitData {
-            message: commit.message_bstr().into(),
+            message,
             author: commit.author()?.into(),
         })
     }

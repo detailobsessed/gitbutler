@@ -505,8 +505,12 @@ impl<'repo> Commit<'repo> {
     }
 
     /// Return `true` if this commit contains a tree that is conflicted.
+    ///
+    /// Checks the commit message for conflict markers first (new style),
+    /// then falls back to the `gitbutler-conflicted` header (legacy).
     pub fn is_conflicted(&self) -> bool {
-        self.headers().is_some_and(|hdr| hdr.is_conflicted())
+        message_is_conflicted(self.inner.message.as_ref())
+            || self.headers().is_some_and(|hdr| hdr.is_conflicted())
     }
 
     /// If the commit is conflicted, then it returns the auto-resolution tree,
@@ -626,4 +630,83 @@ impl ConflictEntries {
 
         set.len()
     }
+}
+
+/// The prefix prepended to the commit subject line to mark a conflicted commit.
+pub const CONFLICT_MESSAGE_PREFIX: &str = "[conflict] ";
+
+/// The marker line in the commit message footer that confirms a GitButler-managed conflict.
+pub const CONFLICT_FOOTER_MARKER: &str = "GitButler-Conflict: true";
+
+/// The full footer appended to a conflicted commit message, explaining the conflict state.
+const CONFLICT_FOOTER: &str = "\
+This is a GitButler-managed conflicted commit. Files are auto-resolved
+using the \"ours\" side. The commit tree contains additional directories:
+  .conflict-side-0  — our tree
+  .conflict-side-1  — their tree
+  .conflict-base-0  — the merge base tree
+  .auto-resolution  — the auto-resolved tree
+  .conflict-files   — metadata about conflicted files
+To manually resolve, check out this commit, remove the directories
+listed above, resolve the conflicts, and amend the commit.
+GitButler-Conflict: true";
+
+/// Add conflict markers (prefix and footer) to a commit message.
+///
+/// Uses byte operations to preserve non-UTF8 content in the original message.
+pub fn add_conflict_markers(message: &BStr) -> BString {
+    let trimmed = message
+        .as_bytes()
+        .strip_suffix(b"\n")
+        .unwrap_or(message.as_bytes());
+    let footer_block = format!("\n\n{CONFLICT_FOOTER}\n");
+    let mut result = BString::from(Vec::with_capacity(
+        CONFLICT_MESSAGE_PREFIX.len() + trimmed.len() + footer_block.len(),
+    ));
+    result.extend_from_slice(CONFLICT_MESSAGE_PREFIX.as_bytes());
+    result.extend_from_slice(trimmed);
+    result.extend_from_slice(footer_block.as_bytes());
+    result
+}
+
+/// The exact footer block suffix appended by [`add_conflict_markers`], used for
+/// suffix-based matching to avoid false positives from partial matches in the
+/// commit body.
+fn conflict_footer_block() -> String {
+    format!("\n\n{CONFLICT_FOOTER}\n")
+}
+
+/// Strip conflict markers (prefix and footer) from a commit message, restoring
+/// the original message. Returns the message unchanged if no markers are found.
+///
+/// Only strips when the exact footer block produced by [`add_conflict_markers`]
+/// is present as a suffix, so arbitrary occurrences of the marker text inside
+/// the commit body cannot cause false stripping.
+pub fn strip_conflict_markers(message: &BStr) -> BString {
+    let bytes = message.as_bytes();
+    let footer = conflict_footer_block();
+
+    let Some(without_footer) = bytes.strip_suffix(footer.as_bytes()) else {
+        // Footer not present — return unchanged to avoid stripping a `[conflict] `
+        // prefix from a non-GitButler commit that happens to start with it.
+        return BString::from(bytes);
+    };
+
+    let without_prefix = without_footer
+        .strip_prefix(CONFLICT_MESSAGE_PREFIX.as_bytes())
+        .unwrap_or(without_footer);
+
+    BString::from(without_prefix)
+}
+
+/// Check if a commit message contains GitButler conflict markers.
+///
+/// Requires both the `[conflict] ` prefix and the exact footer block appended
+/// by [`add_conflict_markers`] as a suffix, so arbitrary commits with
+/// `[conflict]` in their subject or `GitButler-Conflict: true` in the body
+/// are not misidentified.
+pub fn message_is_conflicted(message: &BStr) -> bool {
+    let bytes = message.as_bytes();
+    let footer = conflict_footer_block();
+    bytes.starts_with(CONFLICT_MESSAGE_PREFIX.as_bytes()) && bytes.ends_with(footer.as_bytes())
 }

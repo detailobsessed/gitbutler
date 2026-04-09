@@ -59,12 +59,23 @@ impl From<but_core::Commit<'_>> for Commit {
     fn from(value: but_core::Commit<'_>) -> Self {
         let has_conflicts = value.is_conflicted();
         let change_id = value.headers().and_then(|hdr| hdr.change_id);
+        let id = value.id.into();
+        let tree_id = value.tree;
+        let parent_ids = value.parents.iter().cloned().collect();
+        let gix::objs::Commit {
+            message, author, ..
+        } = value.inner;
+        let message = if has_conflicts {
+            but_core::commit::strip_conflict_markers(message.as_ref())
+        } else {
+            message
+        };
         Commit {
-            id: value.id.into(),
-            tree_id: value.tree,
-            parent_ids: value.parents.iter().cloned().collect(),
-            message: value.inner.message,
-            author: value.inner.author,
+            id,
+            tree_id,
+            parent_ids,
+            message,
+            author,
             has_conflicts,
             change_id,
             refs: Vec::new(),
@@ -80,12 +91,19 @@ impl Commit {
         graph_commit: &but_graph::Commit,
     ) -> Self {
         let hdr = but_core::commit::Headers::try_from_commit(&commit);
+        let has_conflicts = but_core::commit::message_is_conflicted(commit.message.as_ref())
+            || hdr.as_ref().is_some_and(|hdr| hdr.is_conflicted());
+        let message = if has_conflicts {
+            but_core::commit::strip_conflict_markers(commit.message.as_ref())
+        } else {
+            commit.message
+        };
         Commit {
             id: graph_commit.id,
             parent_ids: commit.parents.into_iter().collect(),
             tree_id: commit.tree,
-            message: commit.message,
-            has_conflicts: hdr.as_ref().is_some_and(|hdr| hdr.is_conflicted()),
+            message,
+            has_conflicts,
             author: commit
                 .author
                 .to_ref(&mut gix::date::parse::TimeBuf::default())

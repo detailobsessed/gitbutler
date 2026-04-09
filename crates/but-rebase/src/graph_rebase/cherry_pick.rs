@@ -305,18 +305,21 @@ fn commit_from_unconflicted_tree<'repo>(
     let repo = to_rebase.id.repo;
 
     let headers = to_rebase.headers();
-    let to_rebase_is_conflicted = headers.as_ref().is_some_and(|hdr| hdr.is_conflicted());
+    let was_conflicted = to_rebase.is_conflicted();
     let mut new_commit = to_rebase.inner;
     new_commit.tree = resolved_tree_id.detach();
 
     // Ensure the commit isn't thinking it's conflicted.
-    if to_rebase_is_conflicted {
+    if was_conflicted {
+        // Strip the legacy header if present
         if let Some(pos) = new_commit
             .extra_headers()
             .find_pos(HEADERS_CONFLICTED_FIELD)
         {
             new_commit.extra_headers.remove(pos);
         }
+        // Strip conflict markers from the commit message
+        new_commit.message = but_core::commit::strip_conflict_markers(new_commit.message.as_ref());
     } else if headers.is_none() {
         new_commit
             .extra_headers
@@ -348,10 +351,6 @@ fn commit_from_conflicted_tree<'repo>(
     sign_commit: SignCommit,
 ) -> anyhow::Result<gix::Id<'repo>> {
     let repo = resolved_tree_id.repo;
-    // in case someone checks this out with vanilla Git, we should warn why it looks like this
-    let readme_content =
-        b"You have checked out a GitButler Conflicted commit. You probably didn't mean to do this.";
-    let readme_blob = repo.write_blob(readme_content)?;
 
     let conflicted_files =
         extract_conflicted_files(resolved_tree_id, cherry_pick, treat_as_unresolved)?;
@@ -383,14 +382,19 @@ fn commit_from_conflicted_tree<'repo>(
         resolved_tree_id,
     )?;
     tree.upsert(".conflict-files", EntryKind::Blob, conflicted_files_blob)?;
-    tree.upsert("CONFLICT-README.txt", EntryKind::Blob, readme_blob)?;
 
     let mut headers = to_rebase
         .headers()
         .unwrap_or_else(|| Headers::from_config(&repo.config_snapshot()));
-    headers.conflicted = conflicted_files.conflicted_header_field();
+    headers.conflicted = None;
     to_rebase.tree = tree.write().context("failed to write tree")?.detach();
     to_rebase.parents = parents.into();
+
+    // Add conflict markers to the commit message
+    if !but_core::commit::message_is_conflicted(to_rebase.inner.message.as_ref()) {
+        to_rebase.inner.message =
+            but_core::commit::add_conflict_markers(to_rebase.inner.message.as_ref());
+    }
 
     to_rebase.set_headers(&headers);
     Ok(crate::commit::create(

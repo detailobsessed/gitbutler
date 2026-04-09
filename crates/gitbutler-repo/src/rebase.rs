@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Context as _, Result};
+use bstr::ByteSlice as _;
 use but_core::{
     RepositoryExt,
     commit::{ConflictEntries, Headers},
@@ -112,7 +113,7 @@ pub fn merge_commits(
 
     let tree_oid;
     let forced_resolution = gix::merge::tree::TreatAsUnresolved::forced_resolution();
-    let commit_headers = if merge_result.has_unresolved_conflicts(forced_resolution) {
+    let is_conflicted = if merge_result.has_unresolved_conflicts(forced_resolution) {
         let conflicted_files =
             extract_conflicted_files(merged_tree_id, merge_result, forced_resolution)?;
 
@@ -151,17 +152,17 @@ pub fn merge_commits(
             0o100644,
         )?;
 
-        // in case someone checks this out with vanilla Git, we should warn why it looks like this
-        let readme_content =
-            b"You have checked out a GitButler Conflicted commit. You probably didn't mean to do this.";
-        let readme_blob = repo.blob(readme_content)?;
-        tree_writer.insert("CONFLICT-README.txt", readme_blob, 0o100644)?;
-
         tree_oid = tree_writer.write().context("failed to write tree")?;
-        conflicted_files.to_headers()
+        true
     } else {
         tree_oid = merged_tree_id.to_git2();
-        Headers::new_with_random_change_id()
+        false
+    };
+
+    let message = if is_conflicted {
+        but_core::commit::add_conflict_markers(resulting_name.as_bytes().as_bstr())
+    } else {
+        resulting_name.into()
     };
 
     let (author, committer) = gix_repository.commit_signatures()?;
@@ -170,33 +171,12 @@ pub fn merge_commits(
         None,
         author,
         committer,
-        resulting_name.into(),
+        message.as_ref(),
         tree_oid.to_gix(),
         &[target_commit.id, incoming_commit.id],
-        Some(commit_headers),
+        Some(Headers::new_with_random_change_id()),
     )
     .context("failed to create commit")?;
 
     Ok(commit_oid)
-}
-
-trait ToHeaders {
-    /// Assure that the returned headers will always indicate a conflict.
-    /// This is a fail-safe in case this instance has no paths stored as auto-resolution
-    /// removed the path that would otherwise be conflicting.
-    /// In other words: conflicting index entries aren't reliable when conflicts were resolved
-    /// with the 'ours' strategy.
-    fn to_headers(&self) -> Headers;
-}
-
-impl ToHeaders for ConflictEntries {
-    fn to_headers(&self) -> Headers {
-        Headers {
-            conflicted: Some({
-                let entries = self.total_entries();
-                if entries > 0 { entries as u64 } else { 1 }
-            }),
-            ..Headers::new_with_random_change_id()
-        }
-    }
 }

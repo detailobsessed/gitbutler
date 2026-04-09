@@ -36,7 +36,7 @@ fn by_default_conflicts_are_allowed() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        ├── ·3411540 (⌂|1) ►c
+        ├── ·0a1cbb5 (⌂|1) ►c
         └── ·5e0ba46 (⌂|1) ►a, ►b
             └── ►:1[1]:base
                 └── ·6155f21 (⌂|1)
@@ -45,17 +45,27 @@ fn by_default_conflicts_are_allowed() -> Result<()> {
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     // We expect to see conflicted headers
-    insta::assert_snapshot!(cat_commit(&repo, "c")?, @"
-    tree c199bde16a034b8588f7c896ec3640c40ad017dd
+    insta::assert_snapshot!(cat_commit(&repo, "c")?, @r#"
+    tree d935c009623a61ebde94512baef22c76c5ccbaef
     parent 5e0ba4636be91de6216903697b269915d3db6c53
     author author <author@example.com> 946684800 +0000
     committer Committer (Memory Override) <committer@example.com> 946771200 +0000
     gitbutler-headers-version 2
     change-id 1
-    gitbutler-conflicted 1
 
-    c
-    ");
+    [conflict] c
+
+    This is a GitButler-managed conflicted commit. Files are auto-resolved
+    using the "ours" side. The commit tree contains additional directories:
+      .conflict-side-0  — our tree
+      .conflict-side-1  — their tree
+      .conflict-base-0  — the merge base tree
+      .auto-resolution  — the auto-resolved tree
+      .conflict-files   — metadata about conflicted files
+    To manually resolve, check out this commit, remove the directories
+    listed above, resolve the conflicts, and amend the commit.
+    GitButler-Conflict: true
+    "#);
 
     Ok(())
 }

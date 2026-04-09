@@ -158,10 +158,10 @@ fn causes_conflicts_above() -> anyhow::Result<()> {
         .stdout
         .as_bstr()
         .to_owned();
-    insta::assert_snapshot!(unstable_log, @r"
+    insta::assert_snapshot!(unstable_log, @"
     * GitButler Workspace Commit  (HEAD -> gitbutler/workspace)
     * feature-b: add line 2  (feature-b)
-    * feature-b: add line 1 
+    * [conflict] feature-b: add line 1 
     * Integrated worktree  (feature-a)
     * feature-a: add line 2 
     * feature-a: add line 1 

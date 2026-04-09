@@ -69,7 +69,7 @@ fn basic_cherry_pick_cp_conflicts() -> Result<()> {
 
     insta::assert_debug_snapshot!(result, @"
     ConflictedCommit(
-        Sha1(e9ee7b59aff786fc970c30f6965d1de1913c7ec4),
+        Sha1(a77f7d99f3e0e939e1b211b42bc0aeda1eb282d4),
     )
     ");
 
@@ -80,7 +80,7 @@ fn basic_cherry_pick_cp_conflicts() -> Result<()> {
     assert_eq!(&get_parents(&id.attach(&repo))?, &[onto]);
 
     insta::assert_snapshot!(visualize_tree(id.attach(&repo)), @r#"
-    0367fb7
+    1090f8a
     ├── .auto-resolution:aa3d213 
     │   ├── base-f:100644:7898192 "a\n"
     │   └── target-f:100644:eb5a316 "target\n"
@@ -95,7 +95,6 @@ fn basic_cherry_pick_cp_conflicts() -> Result<()> {
     │   ├── base-f:100644:7898192 "a\n"
     │   ├── clean-f:100644:8312630 "clean\n"
     │   └── target-f:100644:9b1719f "conflict\n"
-    ├── CONFLICT-README.txt:100644:2af04b7 "You have checked out a GitButler Conflicted commit. You probably didn\'t mean to do this."
     ├── base-f:100644:7898192 "a\n"
     └── target-f:100644:eb5a316 "target\n"
     "#);
@@ -184,7 +183,7 @@ fn single_parent_to_multiple_parents_cp_conflicts() -> Result<()> {
 
     insta::assert_debug_snapshot!(result, @"
     ConflictedCommit(
-        Sha1(0fcbe01202743fa55f1a1e07342ad26f2e7a0abe),
+        Sha1(ea4e1f33421b0f4be2ace1c239e27a53cdb04030),
     )
     ");
 
@@ -195,7 +194,7 @@ fn single_parent_to_multiple_parents_cp_conflicts() -> Result<()> {
     assert_eq!(&get_parents(&id.attach(&repo))?, &[onto, onto2]);
 
     insta::assert_snapshot!(visualize_tree(id.attach(&repo)), @r#"
-    1804f3d
+    4c6dc70
     ├── .auto-resolution:744efa9 
     │   ├── base-f:100644:7898192 "a\n"
     │   ├── target-2-f:100644:caac8f9 "target 2\n"
@@ -212,7 +211,6 @@ fn single_parent_to_multiple_parents_cp_conflicts() -> Result<()> {
     │   ├── base-f:100644:7898192 "a\n"
     │   ├── clean-f:100644:8312630 "clean\n"
     │   └── target-f:100644:9b1719f "conflict\n"
-    ├── CONFLICT-README.txt:100644:2af04b7 "You have checked out a GitButler Conflicted commit. You probably didn\'t mean to do this."
     ├── base-f:100644:7898192 "a\n"
     ├── target-2-f:100644:caac8f9 "target 2\n"
     └── target-f:100644:eb5a316 "target\n"
@@ -311,7 +309,7 @@ fn multiple_parents_to_single_parent_cp_conflicts() -> Result<()> {
 
     insta::assert_debug_snapshot!(result, @"
     ConflictedCommit(
-        Sha1(28fa7c91af8652f4e69c1e3184f92569a3468a34),
+        Sha1(4ced2a74d4694fb15fb2c81dd76a77d871feab48),
     )
     ");
 
@@ -322,7 +320,7 @@ fn multiple_parents_to_single_parent_cp_conflicts() -> Result<()> {
     assert_eq!(&get_parents(&id.attach(&repo))?, &[onto]);
 
     insta::assert_snapshot!(visualize_tree(id.attach(&repo)), @r#"
-    91fe014
+    8c4acd1
     ├── .auto-resolution:aa3d213 
     │   ├── base-f:100644:7898192 "a\n"
     │   └── target-f:100644:eb5a316 "target\n"
@@ -339,7 +337,6 @@ fn multiple_parents_to_single_parent_cp_conflicts() -> Result<()> {
     │   ├── clean-2-f:100644:13e9394 "clean 2\n"
     │   ├── clean-f:100644:8312630 "clean\n"
     │   └── target-f:100644:9b1719f "conflict\n"
-    ├── CONFLICT-README.txt:100644:2af04b7 "You have checked out a GitButler Conflicted commit. You probably didn\'t mean to do this."
     ├── base-f:100644:7898192 "a\n"
     └── target-f:100644:eb5a316 "target\n"
     "#);
@@ -441,7 +438,7 @@ fn multiple_parents_to_multiple_parents_cp_conflicts() -> Result<()> {
 
     insta::assert_debug_snapshot!(result, @"
     ConflictedCommit(
-        Sha1(2e6cb06fe98780bb8c7a301a522edd98805d1499),
+        Sha1(c38914f62944ecd7eab9d596d327eda7fbebe8d6),
     )
     ");
 
@@ -452,7 +449,7 @@ fn multiple_parents_to_multiple_parents_cp_conflicts() -> Result<()> {
     assert_eq!(&get_parents(&id.attach(&repo))?, &[onto, onto2]);
 
     insta::assert_snapshot!(visualize_tree(id.attach(&repo)), @r#"
-    0aeaf79
+    1620d95
     ├── .auto-resolution:744efa9 
     │   ├── base-f:100644:7898192 "a\n"
     │   ├── target-2-f:100644:caac8f9 "target 2\n"
@@ -471,7 +468,6 @@ fn multiple_parents_to_multiple_parents_cp_conflicts() -> Result<()> {
     │   ├── clean-2-f:100644:13e9394 "clean 2\n"
     │   ├── clean-f:100644:8312630 "clean\n"
     │   └── target-f:100644:9b1719f "conflict\n"
-    ├── CONFLICT-README.txt:100644:2af04b7 "You have checked out a GitButler Conflicted commit. You probably didn\'t mean to do this."
     ├── base-f:100644:7898192 "a\n"
     ├── target-2-f:100644:caac8f9 "target 2\n"
     └── target-f:100644:eb5a316 "target\n"
@@ -688,7 +684,7 @@ fn no_parents_to_single_parent_cp_conflicts() -> Result<()> {
 
     insta::assert_debug_snapshot!(result, @"
     ConflictedCommit(
-        Sha1(28f862257bff139659b763a2c873b8d3f0f780b0),
+        Sha1(c2a484c123739c28427fb7ca8142a7fbb51585b4),
     )
     ");
 
@@ -699,7 +695,7 @@ fn no_parents_to_single_parent_cp_conflicts() -> Result<()> {
     assert_eq!(&get_parents(&id.attach(&repo))?, &[onto]);
 
     insta::assert_snapshot!(visualize_tree(id.attach(&repo)), @r#"
-    1267a55
+    38edd44
     ├── .auto-resolution:aa3d213 
     │   ├── base-f:100644:7898192 "a\n"
     │   └── target-f:100644:eb5a316 "target\n"
@@ -711,7 +707,6 @@ fn no_parents_to_single_parent_cp_conflicts() -> Result<()> {
     ├── .conflict-side-1:144e5f5 
     │   ├── base-f:100644:7898192 "a\n"
     │   └── target-f:100644:9b1719f "conflict\n"
-    ├── CONFLICT-README.txt:100644:2af04b7 "You have checked out a GitButler Conflicted commit. You probably didn\'t mean to do this."
     ├── base-f:100644:7898192 "a\n"
     └── target-f:100644:eb5a316 "target\n"
     "#);
@@ -738,7 +733,7 @@ fn cherry_pick_back_to_original_parents_unconflicts() -> Result<()> {
 
     insta::assert_debug_snapshot!(result, @"
     ConflictedCommit(
-        Sha1(2e6cb06fe98780bb8c7a301a522edd98805d1499),
+        Sha1(c38914f62944ecd7eab9d596d327eda7fbebe8d6),
     )
     ");
 
@@ -758,7 +753,7 @@ fn cherry_pick_back_to_original_parents_unconflicts() -> Result<()> {
 
     insta::assert_debug_snapshot!(result, @"
     Commit(
-        Sha1(3d7dfa09a071658d3b84eb1ee195ea0ebfeb601f),
+        Sha1(2a307db18bf263e3a802ac71282c5d8016ea75a1),
     )
     ");
 

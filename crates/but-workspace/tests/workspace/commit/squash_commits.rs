@@ -245,7 +245,7 @@ fn squash_down_out_of_order_reorders_subject_below_target_for_shared_file_lineag
     );
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * 09ef005 (HEAD -> three, two) commit two
+    * 2c64f20 (HEAD -> three, two) [conflict] commit two
     * f297a08 (one) commit three
     ");
 

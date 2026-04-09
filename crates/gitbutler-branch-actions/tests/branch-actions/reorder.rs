@@ -495,7 +495,8 @@ fn test_ctx(ctx: &Context) -> Result<TestContext> {
         .iter()
         .map(|id| {
             let commit = repo.find_commit(*id).unwrap();
-            (commit.message_bstr().to_string(), *id)
+            let msg = but_core::commit::strip_conflict_markers(commit.message_bstr());
+            (msg.to_string(), *id)
         })
         .collect();
     let bottom_commits: HashMap<String, gix::ObjectId> = branches[0]
@@ -504,7 +505,8 @@ fn test_ctx(ctx: &Context) -> Result<TestContext> {
         .iter()
         .map(|id| {
             let commit = repo.find_commit(*id).unwrap();
-            (commit.message_bstr().to_string(), *id)
+            let msg = but_core::commit::strip_conflict_markers(commit.message_bstr());
+            (msg.to_string(), *id)
         })
         .collect();
 

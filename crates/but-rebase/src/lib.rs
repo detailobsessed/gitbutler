@@ -328,7 +328,16 @@ fn rebase(
                 let mut new_commit = repo.find_commit(new_commit)?.decode()?.to_owned()?;
                 new_commit.parents = base_commit.parent_ids().map(|id| id.detach()).collect();
                 if let Some(new_message) = new_message {
-                    new_commit.message = new_message;
+                    // Preserve conflict markers if the commit is conflicted,
+                    // but avoid duplicating markers if the new message already has them.
+                    new_commit.message =
+                        if but_core::commit::message_is_conflicted(new_commit.message.as_ref())
+                            && !but_core::commit::message_is_conflicted(new_message.as_ref())
+                        {
+                            but_core::commit::add_conflict_markers(new_message.as_ref())
+                        } else {
+                            new_message
+                        };
                 }
                 *cursor = commit::create(
                     repo,
@@ -374,7 +383,15 @@ fn reword_commit(
     new_message: BString,
 ) -> Result<gix::ObjectId> {
     let mut new_commit = repo.find_commit(oid)?.decode()?.to_owned()?;
-    new_commit.message = new_message;
+    // Preserve conflict markers if the commit was conflicted,
+    // but avoid duplicating markers if the new message already has them.
+    let was_conflicted = but_core::commit::message_is_conflicted(new_commit.message.as_ref());
+    new_commit.message =
+        if was_conflicted && !but_core::commit::message_is_conflicted(new_message.as_ref()) {
+            but_core::commit::add_conflict_markers(new_message.as_ref())
+        } else {
+            new_message
+        };
     Ok(commit::create(
         repo,
         new_commit,

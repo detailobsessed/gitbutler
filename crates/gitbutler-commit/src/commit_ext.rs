@@ -1,4 +1,5 @@
 use bstr::BStr;
+use but_core::commit::message_is_conflicted;
 use but_core::{ChangeId, commit::Headers};
 
 /// Extension trait for `gix::Commit`.
@@ -27,13 +28,16 @@ impl CommitExt for gix::Commit<'_> {
     }
 
     fn is_conflicted(&self) -> bool {
-        self.decode()
-            .ok()
-            .and_then(|commit| {
-                let headers = Headers::try_from_commit_headers(|| commit.extra_headers())?;
-                Some(headers.conflicted? > 0)
-            })
-            .unwrap_or(false)
+        // Check commit message first (new style), fall back to header (legacy).
+        if let Ok(commit) = self.decode() {
+            if message_is_conflicted(commit.message) {
+                return true;
+            }
+            Headers::try_from_commit_headers(|| commit.extra_headers())
+                .is_some_and(|hdr| hdr.is_conflicted())
+        } else {
+            false
+        }
     }
 }
 
