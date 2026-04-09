@@ -138,6 +138,7 @@ pub fn move_commit_to_commit_with_perm(
         source,
         RelativeTo::Commit(target),
         side,
+        false,
         perm,
     )?;
 
@@ -170,6 +171,7 @@ pub fn move_commit_to_branch_with_perm(
         source,
         RelativeTo::Reference(target_full_name),
         InsertSide::Below,
+        false,
         perm,
     )?;
 

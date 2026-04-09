@@ -129,6 +129,7 @@ pub(super) fn perform_operation(
         RubOperation::CommittedFileToCommit(operation) => {
             let result = operation.execute_inner(ctx)?;
             let destination_to_select = result
+                .workspace
                 .replaced_commits
                 .get(&operation.oid)
                 .copied()

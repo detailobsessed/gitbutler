@@ -24,9 +24,11 @@ import { isDefined } from "@gitbutler/ui/utils/typeguards";
 import { get } from "svelte/store";
 import type { ReduxError } from "$lib/error/reduxError";
 import type { DefaultForgeFactory } from "$lib/forge/forgeFactory.svelte";
+import type { DiffSpec } from "$lib/hunks/hunk";
 import type { StackDetails } from "$lib/stacks/stack";
 import type { AppDispatch, BackendApi } from "$lib/state/clientState.svelte";
 import type { HunkAssignment } from "@gitbutler/core/api";
+import type { RefInfo } from "@gitbutler/core/generated/core/refMetadata/index";
 
 export type {
 	BranchParams,
@@ -39,6 +41,17 @@ export type {
 	SeriesIntegrationStrategy,
 } from "$lib/stacks/stackEndpoints";
 export { REJECTTION_REASONS } from "$lib/stacks/stackEndpoints";
+
+type LegacyResult = {
+	replacedCommits: [string, string][];
+};
+
+type NormalizedResult = {
+	workspace: {
+		replacedCommits: Record<string, string>;
+		headInfo?: RefInfo;
+	};
+};
 
 const PUSH_ERROR_REASONS: Record<string, string> = {
 	["errors.git.authentication"]: "an authentication failure",
@@ -607,19 +620,59 @@ export class StackService {
 		return this.backendApi.endpoints.discardChanges.mutate;
 	}
 
-	get moveChangesBetweenCommits() {
+	private normalizeResult(result: LegacyResult | NormalizedResult): NormalizedResult {
+		if ("workspace" in result) return result;
+		return {
+			workspace: {
+				replacedCommits: Object.fromEntries(result.replacedCommits),
+			},
+		};
+	}
+
+	async moveChangesBetweenCommits(args: {
+		projectId: string;
+		changes: DiffSpec[];
+		sourceCommitId: string;
+		sourceStackId: string;
+		destinationCommitId: string;
+		destinationStackId: string;
+	}) {
 		if (get(useNewRebaseEngine)) {
-			return this.backendApi.endpoints.commitMoveChangesBetween.mutate;
+			return this.normalizeResult(
+				await this.backendApi.endpoints.commitMoveChangesBetween.mutate({
+					projectId: args.projectId,
+					changes: args.changes,
+					sourceCommitId: args.sourceCommitId,
+					destinationCommitId: args.destinationCommitId,
+				}),
+			);
 		} else {
-			return this.backendApi.endpoints.legacyMoveChangesBetweenCommits.mutate;
+			return this.normalizeResult(
+				await this.backendApi.endpoints.legacyMoveChangesBetweenCommits.mutate(args),
+			);
 		}
 	}
 
-	get uncommitChanges() {
+	async uncommitChanges(args: {
+		projectId: string;
+		changes: DiffSpec[];
+		commitId: string;
+		stackId: string;
+		assignTo?: string;
+	}) {
 		if (get(useNewRebaseEngine)) {
-			return this.backendApi.endpoints.commitUncommitChanges.mutate;
+			return this.normalizeResult(
+				await this.backendApi.endpoints.commitUncommitChanges.mutate({
+					projectId: args.projectId,
+					changes: args.changes,
+					commitId: args.commitId,
+					assignTo: args.assignTo,
+				}),
+			);
 		} else {
-			return this.backendApi.endpoints.legacyUncommitChanges.mutate;
+			return this.normalizeResult(
+				await this.backendApi.endpoints.legacyUncommitChanges.mutate(args),
+			);
 		}
 	}
 

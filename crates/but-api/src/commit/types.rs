@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use but_core::{DiffSpec, tree::create_tree::RejectionReason};
 
 /// Outcome after creating a commit.
@@ -8,58 +6,58 @@ pub struct CommitCreateResult {
     pub new_commit: Option<gix::ObjectId>,
     /// Any specs that failed to be committed.
     pub rejected_specs: Vec<(RejectionReason, DiffSpec)>,
-    /// Commits that were replaced by this operation. Maps `old_id -> new_id`.
-    pub replaced_commits: BTreeMap<gix::ObjectId, gix::ObjectId>,
+    /// Workspace state after the create or amend.
+    pub workspace: crate::types::WorkspaceState,
 }
 
 /// Outcome after moving changes between commits.
 pub struct MoveChangesResult {
-    /// Commits that were replaced by this operation. Maps `old_id -> new_id`.
-    pub replaced_commits: BTreeMap<gix::ObjectId, gix::ObjectId>,
+    /// Workspace state after moving changes.
+    pub workspace: crate::types::WorkspaceState,
 }
 
 /// Outcome after rewording a commit.
 pub struct CommitRewordResult {
     /// The ID of the newly created commit with the updated message.
     pub new_commit: gix::ObjectId,
-    /// Commits that were replaced by this operation. Maps `old_id -> new_id`.
-    pub replaced_commits: BTreeMap<gix::ObjectId, gix::ObjectId>,
+    /// Workspace state after the reword.
+    pub workspace: crate::types::WorkspaceState,
 }
 
 /// Outcome of squashing one commit into another.
 pub struct CommitSquashResult {
     /// The ID of the newly created squashed commit.
     pub new_commit: gix::ObjectId,
-    /// Commits that were replaced by this operation. Maps `old_id -> new_id`.
-    pub replaced_commits: BTreeMap<gix::ObjectId, gix::ObjectId>,
+    /// Workspace state after the squash.
+    pub workspace: crate::types::WorkspaceState,
 }
 
 /// Outcome of moving a commit.
 pub struct CommitMoveResult {
-    /// Commits that were replaced by this operation. Maps `old_id -> new_id`.
-    pub replaced_commits: BTreeMap<gix::ObjectId, gix::ObjectId>,
+    /// Workspace state after the move.
+    pub workspace: crate::types::WorkspaceState,
 }
 
 /// Outcome after inserting a blank commit.
 pub struct CommitInsertBlankResult {
     /// The ID of the newly inserted blank commit.
     pub new_commit: gix::ObjectId,
-    /// Commits that were replaced by this operation. Maps `old_id -> new_id`.
-    pub replaced_commits: BTreeMap<gix::ObjectId, gix::ObjectId>,
+    /// Workspace state after inserting the blank commit.
+    pub workspace: crate::types::WorkspaceState,
 }
 
 /// Outcome of discarding a commit.
 pub struct CommitDiscardResult {
     /// The ID of the commit discarded.
     pub discarded_commit: gix::ObjectId,
-    /// Commits that were replaced by this operation. Maps `old_id -> new_id`.
-    pub replaced_commits: BTreeMap<gix::ObjectId, gix::ObjectId>,
+    /// Workspace state after discarding the commit.
+    pub workspace: crate::types::WorkspaceState,
 }
 
 /// Outcome of undoing a commit.
 pub struct CommitUndoResult {
     /// The ID of the commit that was undone.
     pub undone_commit: gix::ObjectId,
-    /// Commits that were replaced by this operation. Maps `old_id -> new_id`.
-    pub replaced_commits: BTreeMap<gix::ObjectId, gix::ObjectId>,
+    /// Workspace state after undoing the commit.
+    pub workspace: crate::types::WorkspaceState,
 }

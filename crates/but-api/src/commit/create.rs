@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use but_api_macros::but_api;
 use but_core::{DiffSpec, sync::RepoExclusive};
 use but_oplog::legacy::{OperationKind, SnapshotDetails};
@@ -25,6 +23,7 @@ pub fn commit_create_only(
     side: InsertSide,
     changes: Vec<DiffSpec>,
     message: String,
+    dry_run: bool,
 ) -> anyhow::Result<CommitCreateResult> {
     let context_lines = ctx.settings.context_lines;
     let mut guard = ctx.exclusive_worktree_access();
@@ -34,23 +33,27 @@ pub fn commit_create_only(
         side,
         changes,
         message,
+        dry_run,
         context_lines,
         guard.write_permission(),
     )
 }
 
 /// Creates and inserts a commit relative to either a commit or a reference.
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn commit_create_only_impl(
     ctx: &mut but_ctx::Context,
     relative_to: RelativeTo,
     side: InsertSide,
     changes: Vec<DiffSpec>,
     message: String,
+    dry_run: bool,
     context_lines: u32,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<CommitCreateResult> {
     let mut meta = ctx.meta()?;
     let (repo, mut ws, _, _cache) = ctx.workspace_mut_and_db_and_cache_with_perm(perm)?;
+    let mut cache = ctx.cache.get_cache_mut()?;
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
 
     let but_workspace::commit::CommitCreateOutcome {
@@ -66,20 +69,16 @@ pub(crate) fn commit_create_only_impl(
         context_lines,
     )?;
 
-    let (new_commit, replaced_commits) = match commit_selector {
-        Some(commit_selector) => {
-            let materialized = rebase.materialize()?;
-            let new_commit = materialized.lookup_pick(commit_selector)?;
-            let replaced_commits = materialized.history.commit_mappings();
-            (Some(new_commit), replaced_commits)
-        }
-        None => (None, BTreeMap::new()),
-    };
+    let new_commit = commit_selector
+        .map(|commit_selector| rebase.lookup_pick(commit_selector))
+        .transpose()?;
+    let workspace =
+        crate::workspace_state::from_successful_rebase(rebase, &repo, &mut cache, dry_run)?;
 
     Ok(CommitCreateResult {
         new_commit,
         rejected_specs,
-        replaced_commits,
+        workspace,
     })
 }
 
@@ -99,6 +98,7 @@ pub fn commit_create(
     side: InsertSide,
     changes: Vec<DiffSpec>,
     message: String,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<CommitCreateResult> {
     let context_lines = ctx.settings.context_lines;
@@ -115,11 +115,10 @@ pub fn commit_create(
         side,
         changes,
         message,
+        dry_run,
         context_lines,
         perm,
     );
-    if let Some(snapshot) = maybe_oplog_entry.filter(|_| res.is_ok()) {
-        snapshot.commit(ctx, perm).ok();
-    };
+    crate::commit_oplog_snapshot_if_success(dry_run, maybe_oplog_entry, ctx, perm, &res);
     res
 }

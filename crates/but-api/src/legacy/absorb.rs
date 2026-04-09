@@ -426,6 +426,7 @@ fn determine_target_commit(
             ctx,
             RelativeTo::Reference(branch.reference.clone()),
             InsertSide::Below,
+            false,
             perm,
         )?;
 
@@ -461,6 +462,7 @@ fn determine_target_commit(
             ctx,
             RelativeTo::Reference(branch.reference.clone()),
             InsertSide::Below,
+            false,
             perm,
         )?;
 

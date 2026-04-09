@@ -193,6 +193,7 @@ fn edit_commit_message_by_id_and_reword_commit(
             ctx,
             commit_oid,
             BString::from(new_message),
+            false,
             perm,
         )?;
 

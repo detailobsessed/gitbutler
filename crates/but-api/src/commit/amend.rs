@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use but_api_macros::but_api;
 use but_core::{DiffSpec, sync::RepoExclusive};
 use but_oplog::legacy::{OperationKind, SnapshotDetails};
@@ -18,6 +16,7 @@ pub fn commit_amend_only(
     ctx: &mut but_ctx::Context,
     commit_id: gix::ObjectId,
     changes: Vec<DiffSpec>,
+    dry_run: bool,
 ) -> anyhow::Result<CommitCreateResult> {
     let context_lines = ctx.settings.context_lines;
     let mut guard = ctx.exclusive_worktree_access();
@@ -25,6 +24,7 @@ pub fn commit_amend_only(
         ctx,
         commit_id,
         changes,
+        dry_run,
         context_lines,
         guard.write_permission(),
     )
@@ -34,11 +34,13 @@ pub(crate) fn commit_amend_only_impl(
     ctx: &mut but_ctx::Context,
     commit_id: gix::ObjectId,
     changes: Vec<DiffSpec>,
+    dry_run: bool,
     context_lines: u32,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<CommitCreateResult> {
     let mut meta = ctx.meta()?;
     let (repo, mut ws, _, _cache) = ctx.workspace_mut_and_db_and_cache_with_perm(perm)?;
+    let mut cache = ctx.cache.get_cache_mut()?;
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
 
     let but_workspace::commit::CommitAmendOutcome {
@@ -47,20 +49,16 @@ pub(crate) fn commit_amend_only_impl(
         rejected_specs,
     } = but_workspace::commit::commit_amend(editor, commit_id, changes, context_lines)?;
 
-    let (new_commit, replaced_commits) = match commit_selector {
-        Some(commit_selector) => {
-            let materialized = rebase.materialize()?;
-            let new_commit = materialized.lookup_pick(commit_selector)?;
-            let replaced_commits = materialized.history.commit_mappings();
-            (Some(new_commit), replaced_commits)
-        }
-        None => (None, BTreeMap::new()),
-    };
+    let new_commit = commit_selector
+        .map(|commit_selector| rebase.lookup_pick(commit_selector))
+        .transpose()?;
+    let workspace =
+        crate::workspace_state::from_successful_rebase(rebase, &repo, &mut cache, dry_run)?;
 
     Ok(CommitCreateResult {
         new_commit,
         rejected_specs,
-        replaced_commits,
+        workspace,
     })
 }
 
@@ -76,6 +74,7 @@ pub fn commit_amend(
     ctx: &mut but_ctx::Context,
     commit_id: gix::ObjectId,
     changes: Vec<DiffSpec>,
+    dry_run: bool,
 ) -> anyhow::Result<CommitCreateResult> {
     let context_lines = ctx.settings.context_lines;
     let maybe_oplog_entry = but_oplog::UnmaterializedOplogSnapshot::from_details(
@@ -89,11 +88,16 @@ pub fn commit_amend(
         ctx,
         commit_id,
         changes,
+        dry_run,
         context_lines,
         guard.write_permission(),
     );
-    if let Some(snapshot) = maybe_oplog_entry.filter(|_| res.is_ok()) {
-        snapshot.commit(ctx, guard.write_permission()).ok();
-    };
+    crate::commit_oplog_snapshot_if_success(
+        dry_run,
+        maybe_oplog_entry,
+        ctx,
+        guard.write_permission(),
+        &res,
+    );
     res
 }

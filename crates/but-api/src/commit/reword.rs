@@ -21,9 +21,10 @@ pub fn commit_reword_only(
     ctx: &mut but_ctx::Context,
     commit_id: gix::ObjectId,
     message: BString,
+    dry_run: bool,
 ) -> anyhow::Result<CommitRewordResult> {
     let mut guard = ctx.exclusive_worktree_access();
-    commit_reword_only_with_perm(ctx, commit_id, message, guard.write_permission())
+    commit_reword_only_with_perm(ctx, commit_id, message, dry_run, guard.write_permission())
 }
 
 /// Replace the stored message of `commit_id` under caller-held exclusive
@@ -36,22 +37,23 @@ pub fn commit_reword_only_with_perm(
     ctx: &mut but_ctx::Context,
     commit_id: gix::ObjectId,
     message: BString,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<CommitRewordResult> {
     let mut meta = ctx.meta()?;
-    let (repo, mut ws, _, _cache) = ctx.workspace_mut_and_db_and_cache_with_perm(perm)?;
+    let (repo, mut ws, _) = ctx.workspace_mut_and_db_with_perm(perm)?;
+    let mut cache = ctx.cache.get_cache_mut()?;
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
 
-    let (outcome, edited_commit_selector) =
+    let (rebase, edited_commit_selector) =
         but_workspace::commit::reword(editor, commit_id, message.as_bstr())?;
-
-    let outcome = outcome.materialize()?;
-    let id = outcome.lookup_pick(edited_commit_selector)?;
-    let replaced_commits = outcome.history.commit_mappings();
+    let new_commit = rebase.lookup_pick(edited_commit_selector)?;
+    let workspace =
+        crate::workspace_state::from_successful_rebase(rebase, &repo, &mut cache, dry_run)?;
 
     Ok(CommitRewordResult {
-        new_commit: id,
-        replaced_commits,
+        new_commit,
+        workspace,
     })
 }
 
@@ -66,9 +68,10 @@ pub fn commit_reword(
     ctx: &mut but_ctx::Context,
     commit_id: gix::ObjectId,
     message: BString,
+    dry_run: bool,
 ) -> anyhow::Result<CommitRewordResult> {
     let mut guard = ctx.exclusive_worktree_access();
-    commit_reword_with_perm(ctx, commit_id, message, guard.write_permission())
+    commit_reword_with_perm(ctx, commit_id, message, dry_run, guard.write_permission())
 }
 
 /// Rewords `commit_id` to `message` under caller-held exclusive repository
@@ -81,6 +84,7 @@ pub fn commit_reword_with_perm(
     ctx: &mut but_ctx::Context,
     commit_id: gix::ObjectId,
     message: BString,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<CommitRewordResult> {
     let maybe_oplog_entry = but_oplog::UnmaterializedOplogSnapshot::from_details_with_perm(
@@ -90,9 +94,7 @@ pub fn commit_reword_with_perm(
     )
     .ok();
 
-    let res = commit_reword_only_with_perm(ctx, commit_id, message, perm);
-    if let Some(snapshot) = maybe_oplog_entry.filter(|_| res.is_ok()) {
-        snapshot.commit(ctx, perm).ok();
-    };
+    let res = commit_reword_only_with_perm(ctx, commit_id, message, dry_run, perm);
+    crate::commit_oplog_snapshot_if_success(dry_run, maybe_oplog_entry, ctx, perm, &res);
     res
 }

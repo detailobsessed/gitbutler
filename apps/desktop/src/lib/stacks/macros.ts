@@ -100,7 +100,7 @@ export default class StackMacros {
 		branchName: string,
 		changes: DiffSpec[],
 	) {
-		const { replacedCommits } = await this.stackService.moveChangesBetweenCommits({
+		const { workspace } = await this.stackService.moveChangesBetweenCommits({
 			projectId: this.projectId,
 			destinationStackId: destinationStackId,
 			destinationCommitId: destinationCommitId,
@@ -109,7 +109,7 @@ export default class StackMacros {
 			changes,
 		});
 
-		const newCommitId = replacedCommits.find(([before]) => before === destinationCommitId)?.[1];
+		const newCommitId = workspace.replacedCommits[destinationCommitId];
 		if (!newCommitId) {
 			// This happened only if something went wrong
 			throw new Error("No new commit id found for the moved changes");

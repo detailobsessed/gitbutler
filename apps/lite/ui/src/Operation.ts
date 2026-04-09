@@ -211,6 +211,7 @@ export const useRunOperation = () => {
 							projectId,
 							commitId: operation.commitId,
 							changes: operation.changes,
+							dryRun: operation.dryRun,
 						},
 						{
 							onSuccess: (response) => {
@@ -231,6 +232,7 @@ export const useRunOperation = () => {
 						sourceCommitId: operation.sourceCommitId,
 						destinationCommitId: operation.destinationCommitId,
 						changes: operation.changes,
+						dryRun: operation.dryRun,
 					});
 				},
 				CommitSquash: (operation) => {
@@ -238,6 +240,7 @@ export const useRunOperation = () => {
 						projectId,
 						sourceCommitId: operation.sourceCommitId,
 						destinationCommitId: operation.destinationCommitId,
+						dryRun: operation.dryRun,
 					});
 				},
 				CommitUncommit: (operation) => {
@@ -253,6 +256,7 @@ export const useRunOperation = () => {
 						commitId: operation.commitId,
 						assignTo: operation.assignTo,
 						changes: operation.changes,
+						dryRun: operation.dryRun,
 					});
 				},
 				CommitCreate: (operation) => {
@@ -263,6 +267,7 @@ export const useRunOperation = () => {
 							side: operation.side,
 							changes: operation.changes,
 							message: operation.message,
+							dryRun: operation.dryRun,
 						},
 						{
 							onSuccess: (response) => {
@@ -284,15 +289,17 @@ export const useRunOperation = () => {
 							projectId,
 							relativeTo: operation.relativeTo,
 							side: operation.side,
+							dryRun: operation.dryRun,
 						});
 
 						await commitMoveChangesBetween.mutateAsync({
 							projectId,
 							sourceCommitId:
-								insertedCommit.replacedCommits[operation.sourceCommitId] ??
+								insertedCommit.workspace.replacedCommits[operation.sourceCommitId] ??
 								operation.sourceCommitId,
 							destinationCommitId: insertedCommit.newCommit,
 							changes: operation.changes,
+							dryRun: operation.dryRun,
 						});
 					})();
 				},
@@ -302,6 +309,7 @@ export const useRunOperation = () => {
 						subjectCommitId: operation.subjectCommitId,
 						relativeTo: operation.relativeTo,
 						side: operation.side,
+						dryRun: operation.dryRun,
 					});
 				},
 				MoveBranch: (operation) => {
@@ -309,12 +317,14 @@ export const useRunOperation = () => {
 						projectId,
 						subjectBranch: operation.subjectBranch,
 						targetBranch: operation.targetBranch,
+						dryRun: operation.dryRun,
 					});
 				},
 				TearOffBranch: (operation) => {
 					tearOffBranch.mutate({
 						projectId,
 						subjectBranch: operation.subjectBranch,
+						dryRun: operation.dryRun,
 					});
 				},
 			}),

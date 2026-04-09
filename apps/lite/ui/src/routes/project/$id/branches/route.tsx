@@ -249,6 +249,7 @@ const BranchMenuPopup: FC<{
 						applyBranch.mutate({
 							projectId,
 							existingBranch: getBranchRef(branch),
+							dryRun: false,
 						});
 					}}
 				>
@@ -302,6 +303,7 @@ const BranchApplyToggle: FC<{
 				applyBranch.mutate({
 					projectId,
 					existingBranch: getBranchRef(branch),
+					dryRun: false,
 				});
 			}}
 		>

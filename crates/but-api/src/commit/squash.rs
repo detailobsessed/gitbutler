@@ -18,12 +18,14 @@ pub fn commit_squash_only(
     ctx: &mut but_ctx::Context,
     subject_commit_id: gix::ObjectId,
     target_commit_id: gix::ObjectId,
+    dry_run: bool,
 ) -> anyhow::Result<CommitSquashResult> {
     let mut guard = ctx.exclusive_worktree_access();
     commit_squash_only_with_perm(
         ctx,
         subject_commit_id,
         target_commit_id,
+        dry_run,
         guard.write_permission(),
     )
 }
@@ -39,21 +41,24 @@ pub fn commit_squash_only_with_perm(
     ctx: &mut but_ctx::Context,
     subject_commit_id: gix::ObjectId,
     target_commit_id: gix::ObjectId,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<CommitSquashResult> {
     let mut meta = ctx.meta()?;
     let (repo, mut ws, _) = ctx.workspace_mut_and_db_with_perm(perm)?;
+    let mut cache = ctx.cache.get_cache_mut()?;
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
 
     let outcome =
         but_workspace::commit::squash_commits(editor, subject_commit_id, target_commit_id)?;
 
-    let materialized = outcome.rebase.materialize()?;
-    let new_commit = materialized.lookup_pick(outcome.commit_selector)?;
+    let new_commit = outcome.rebase.lookup_pick(outcome.commit_selector)?;
+    let workspace =
+        crate::workspace_state::from_successful_rebase(outcome.rebase, &repo, &mut cache, dry_run)?;
 
     Ok(CommitSquashResult {
         new_commit,
-        replaced_commits: materialized.history.commit_mappings(),
+        workspace,
     })
 }
 
@@ -70,12 +75,14 @@ pub fn commit_squash(
     ctx: &mut but_ctx::Context,
     subject_commit_id: gix::ObjectId,
     target_commit_id: gix::ObjectId,
+    dry_run: bool,
 ) -> anyhow::Result<CommitSquashResult> {
     let mut guard = ctx.exclusive_worktree_access();
     commit_squash_with_perm(
         ctx,
         subject_commit_id,
         target_commit_id,
+        dry_run,
         guard.write_permission(),
     )
 }
@@ -91,6 +98,7 @@ pub fn commit_squash_with_perm(
     ctx: &mut but_ctx::Context,
     subject_commit_id: gix::ObjectId,
     target_commit_id: gix::ObjectId,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<CommitSquashResult> {
     let maybe_oplog_entry = but_oplog::UnmaterializedOplogSnapshot::from_details_with_perm(
@@ -100,9 +108,7 @@ pub fn commit_squash_with_perm(
     )
     .ok();
 
-    let res = commit_squash_only_with_perm(ctx, subject_commit_id, target_commit_id, perm);
-    if let Some(snapshot) = maybe_oplog_entry.filter(|_| res.is_ok()) {
-        snapshot.commit(ctx, perm).ok();
-    };
+    let res = commit_squash_only_with_perm(ctx, subject_commit_id, target_commit_id, dry_run, perm);
+    crate::commit_oplog_snapshot_if_success(dry_run, maybe_oplog_entry, ctx, perm, &res);
     res
 }

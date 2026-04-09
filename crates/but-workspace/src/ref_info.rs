@@ -400,6 +400,26 @@ pub(crate) mod function {
         graph_to_ref_info(graph, repo, opts, cache)
     }
 
+    /// Convert an already prepared graph into [`RefInfo`].
+    ///
+    /// This is useful for callers that already have an overlayed or otherwise
+    /// synthesized graph and need the same UI-facing workspace view as
+    /// [`head_info()`] and [`ref_info()`] without re-traversing from the
+    /// repository entrypoint.
+    pub fn ref_info_from_graph(
+        graph: Graph,
+        repo: &gix::Repository,
+        opts: super::Options,
+        cache: &mut but_db::CacheHandle,
+    ) -> anyhow::Result<RefInfo> {
+        if graph.hard_limit_hit() {
+            tracing::warn!(hard_limit=?opts.traversal.hard_limit,
+                "Commit-graph traversal might be incorrect as it was stopped too early due to hard limit",
+            );
+        }
+        graph_to_ref_info(graph, repo, opts, cache)
+    }
+
     pub(crate) fn find_ancestor_workspace_commit(
         graph: &Graph,
         repo: &gix::Repository,

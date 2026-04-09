@@ -249,6 +249,14 @@ pub struct SuccessfulRebase<'ws, 'meta, M: RefMetadata> {
 }
 
 impl<'ws, 'meta, M: RefMetadata> SuccessfulRebase<'ws, 'meta, M> {
+    /// Returns the in-memory repository that backs this rebase preview.
+    ///
+    /// This repository may contain objects that have not been persisted yet,
+    /// which makes it suitable for dry-run inspection of [`Self::overlayed_graph`].
+    pub fn repository(&self) -> &gix::Repository {
+        &self.repo
+    }
+
     /// Returns a preview of what the but-graph will look like after
     /// materialization.
     ///

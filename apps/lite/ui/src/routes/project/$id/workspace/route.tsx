@@ -823,6 +823,7 @@ const CommitMenuPopup: FC<{
 									projectId,
 									relativeTo: { type: "commit", subject: commitId },
 									side: "above",
+									dryRun: false,
 								});
 							}}
 						>
@@ -835,6 +836,7 @@ const CommitMenuPopup: FC<{
 									projectId,
 									relativeTo: { type: "commit", subject: commitId },
 									side: "below",
+									dryRun: false,
 								});
 							}}
 						>
@@ -850,6 +852,7 @@ const CommitMenuPopup: FC<{
 					commitDiscard.mutate({
 						projectId,
 						subjectCommitId: commitId,
+						dryRun: false,
 					});
 				}}
 			>
@@ -932,6 +935,7 @@ const CommitRow: FC<
 					projectId,
 					commitId: commit.id,
 					message: trimmed,
+					dryRun: false,
 				});
 			} catch {
 				// Use the global mutation error handler (shows toast) instead of React

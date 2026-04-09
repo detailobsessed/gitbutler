@@ -27,6 +27,7 @@ import type {
 import type { BackendEndpointBuilder } from "$lib/state/backendApi";
 import type { RejectionReason } from "$lib/state/uiState.svelte";
 import type { HunkAssignment } from "@gitbutler/core/api";
+import type { RefInfo } from "@gitbutler/core/generated/core/refMetadata/index";
 
 export type { RejectionReason };
 
@@ -87,10 +88,15 @@ type BackendRejectedChange = {
 	path: string;
 };
 
+type BackendWorkspaceState = {
+	replacedCommits: Record<string, string>;
+	headInfo?: RefInfo;
+};
+
 type BackendCreateCommitOutcome = {
 	newCommit?: string | null;
 	rejectedChanges: BackendRejectedChange[];
-	replacedCommits: Record<string, string>;
+	workspace: BackendWorkspaceState;
 };
 
 export type CreateCommitOutcome = {
@@ -101,16 +107,16 @@ export type CreateCommitOutcome = {
 
 type BackendCommitRewordResult = {
 	newCommit: string;
-	replacedCommits: Record<string, string>;
+	workspace: BackendWorkspaceState;
 };
 
 type BackendCommitInsertBlankResult = {
 	newCommit: string;
-	replacedCommits: Record<string, string>;
+	workspace: BackendWorkspaceState;
 };
 
 type BackendMoveChangesResult = {
-	replacedCommits: Record<string, string>;
+	workspace: BackendWorkspaceState;
 };
 
 export type RelativeTo =
@@ -129,7 +135,7 @@ export function normalizeCreateCommitOutcome(
 	return {
 		newCommit: response.newCommit ?? null,
 		rejectedChanges: response.rejectedChanges,
-		commitMapping: Object.entries(response.replacedCommits),
+		commitMapping: Object.entries(response.workspace.replacedCommits),
 	};
 }
 
@@ -619,9 +625,7 @@ export function buildStackEndpoints(build: BackendEndpointBuilder) {
 			},
 		}),
 		commitMoveChangesBetween: build.mutation<
-			{
-				replacedCommits: ReplacedCommit[];
-			},
+			BackendMoveChangesResult,
 			{
 				projectId: string;
 				changes: DiffSpec[];
@@ -634,9 +638,6 @@ export function buildStackEndpoints(build: BackendEndpointBuilder) {
 				actionName: "Move Changes Between Commits",
 			},
 			query: (args) => args,
-			transformResponse: (a: BackendMoveChangesResult) => ({
-				replacedCommits: Object.entries(a.replacedCommits),
-			}),
 			invalidatesTags: [
 				invalidatesList(ReduxTag.HeadSha),
 				invalidatesList(ReduxTag.WorktreeChanges),
@@ -667,9 +668,7 @@ export function buildStackEndpoints(build: BackendEndpointBuilder) {
 			},
 		}),
 		commitUncommitChanges: build.mutation<
-			{
-				replacedCommits: ReplacedCommit[];
-			},
+			BackendMoveChangesResult,
 			{
 				projectId: string;
 				changes: DiffSpec[];
@@ -682,9 +681,6 @@ export function buildStackEndpoints(build: BackendEndpointBuilder) {
 				actionName: "Uncommit Changes",
 			},
 			query: (args) => args,
-			transformResponse: (a: BackendMoveChangesResult) => ({
-				replacedCommits: Object.entries(a.replacedCommits),
-			}),
 			invalidatesTags() {
 				return [
 					invalidatesList(ReduxTag.HeadSha),

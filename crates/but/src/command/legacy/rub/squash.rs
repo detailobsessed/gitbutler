@@ -277,9 +277,16 @@ fn squash_commits_internal(
                 ctx,
                 remapped_source_oid,
                 new_commit_oid,
+                false,
                 perm,
             )?;
-            rewritten_commits.extend(squash_result.replaced_commits.iter().map(|(k, v)| (*k, *v)));
+            rewritten_commits.extend(
+                squash_result
+                    .workspace
+                    .replaced_commits
+                    .iter()
+                    .map(|(k, v)| (*k, *v)),
+            );
             new_commit_oid = squash_result.new_commit;
         }
 
@@ -296,6 +303,7 @@ fn squash_commits_internal(
                 ctx,
                 new_commit_oid,
                 BString::from(ai_message),
+                false,
                 perm,
             )?
             .new_commit
@@ -304,6 +312,7 @@ fn squash_commits_internal(
                 ctx,
                 new_commit_oid,
                 BString::from(msg),
+                false,
                 perm,
             )?
             .new_commit
@@ -312,6 +321,7 @@ fn squash_commits_internal(
                 ctx,
                 new_commit_oid,
                 BString::from(target_msg),
+                false,
                 perm,
             )?
             .new_commit

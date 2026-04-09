@@ -1,13 +1,12 @@
-use std::collections::BTreeMap;
+use std::mem::ManuallyDrop;
 
 use but_api_macros::but_api;
 use but_core::{
-    RefMetadata, sync::RepoExclusive, ui::TreeChanges,
-    worktree::checkout::UncommitedWorktreeChanges,
+    sync::RepoExclusive, ui::TreeChanges, worktree::checkout::UncommitedWorktreeChanges,
 };
 use but_ctx::Context;
 use but_oplog::legacy::{OperationKind, SnapshotDetails, Trailer};
-use but_rebase::graph_rebase::Editor;
+use but_rebase::graph_rebase::{Editor, SuccessfulRebase};
 use but_workspace::branch::{
     OnWorkspaceMergeConflict,
     apply::{WorkspaceMerge, WorkspaceReferenceNaming},
@@ -16,15 +15,15 @@ use tracing::instrument;
 
 /// Outcome after moving a branch.
 pub struct MoveBranchResult {
-    /// Commits that were replaced while transplanting a branch.
-    pub replaced_commits: BTreeMap<gix::ObjectId, gix::ObjectId>,
+    /// Workspace state after moving or tearing off a branch.
+    pub workspace: crate::types::WorkspaceState,
 }
 
 /// JSON transport types for branch APIs.
 pub mod json {
     use serde::Serialize;
 
-    use crate::{branch::MoveBranchResult as InternalMoveBranchResult, json::HexHash};
+    use crate::branch::MoveBranchResult as InternalMoveBranchResult;
 
     /// JSON sibling of [`but_workspace::branch::apply::Outcome`].
     #[derive(Debug, Serialize)]
@@ -65,13 +64,8 @@ pub mod json {
     #[serde(rename_all = "camelCase")]
     /// JSON transport type for moving a branch.
     pub struct MoveBranchResult {
-        /// Commits that have been replaced after transplanting a branch.
-        /// Maps `oldId → newId`.
-        #[cfg_attr(
-            feature = "export-schema",
-            schemars(with = "std::collections::BTreeMap<String, String>")
-        )]
-        pub replaced_commits: std::collections::BTreeMap<HexHash, HexHash>,
+        /// Workspace state after moving or tearing off a branch.
+        pub workspace: crate::json::WorkspaceState,
     }
     #[cfg(feature = "export-schema")]
     but_schemars::register_sdk_type!(MoveBranchResult);
@@ -79,11 +73,7 @@ pub mod json {
     impl From<InternalMoveBranchResult> for MoveBranchResult {
         fn from(value: InternalMoveBranchResult) -> Self {
             Self {
-                replaced_commits: value
-                    .replaced_commits
-                    .into_iter()
-                    .map(|(old, new)| (old.into(), new.into()))
-                    .collect(),
+                workspace: value.workspace.into(),
             }
         }
     }
@@ -96,9 +86,10 @@ pub mod json {
 pub fn apply_only(
     ctx: &mut but_ctx::Context,
     existing_branch: &gix::refs::FullNameRef,
+    dry_run: bool,
 ) -> anyhow::Result<but_workspace::branch::apply::Outcome<'static>> {
     let mut guard = ctx.exclusive_worktree_access();
-    apply_only_with_perm(ctx, existing_branch, guard.write_permission())
+    apply_only_with_perm(ctx, existing_branch, dry_run, guard.write_permission())
 }
 
 /// Applies `existing_branch` to the current workspace under caller-held
@@ -112,30 +103,43 @@ pub fn apply_only(
 pub fn apply_only_with_perm(
     ctx: &mut but_ctx::Context,
     existing_branch: &gix::refs::FullNameRef,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<but_workspace::branch::apply::Outcome<'static>> {
+    let apply_options = but_workspace::branch::apply::Options {
+        workspace_merge: WorkspaceMerge::default(),
+        on_workspace_conflict: OnWorkspaceMergeConflict::default(),
+        workspace_reference_naming: WorkspaceReferenceNaming::default(),
+        uncommitted_changes: UncommitedWorktreeChanges::default(),
+        order: None,
+        new_stack_id: None,
+    };
+
+    if dry_run {
+        return apply_only_preview_with_perm(ctx, existing_branch, apply_options, perm);
+    }
+
     let mut meta = ctx.meta()?;
     let (repo, mut ws, _) = ctx.workspace_mut_and_db_with_perm(perm)?;
-    let out = but_workspace::branch::apply(
-        existing_branch,
-        &ws,
-        &repo,
-        &mut meta,
-        // NOTE: Options can later be passed as parameter, or we have a separate function for that.
-        //       Showing them off here while leaving defaults.
-        but_workspace::branch::apply::Options {
-            workspace_merge: WorkspaceMerge::default(),
-            on_workspace_conflict: OnWorkspaceMergeConflict::default(),
-            workspace_reference_naming: WorkspaceReferenceNaming::default(),
-            uncommitted_changes: UncommitedWorktreeChanges::default(),
-            order: None,
-            new_stack_id: None,
-        },
-    )?
-    .into_owned();
+    let out = but_workspace::branch::apply(existing_branch, &ws, &repo, &mut meta, apply_options)?
+        .into_owned();
 
     *ws = out.workspace.clone().into_owned();
     Ok(out)
+}
+
+fn apply_only_preview_with_perm(
+    ctx: &mut but_ctx::Context,
+    existing_branch: &gix::refs::FullNameRef,
+    apply_options: but_workspace::branch::apply::Options,
+    perm: &mut RepoExclusive,
+) -> anyhow::Result<but_workspace::branch::apply::Outcome<'static>> {
+    let repo = ctx.clone_repo_for_merging_non_persisting()?;
+    let mut meta = ManuallyDrop::new(ctx.meta()?);
+    let (_repo, ws, _) = ctx.workspace_mut_and_db_with_perm(perm)?;
+
+    but_workspace::branch::apply(existing_branch, &ws, &repo, &mut *meta, apply_options)
+        .map(but_workspace::branch::apply::Outcome::into_owned)
 }
 
 /// Applies `existing_branch` using the behavior described by
@@ -148,9 +152,10 @@ pub fn apply_only_with_perm(
 pub fn apply(
     ctx: &mut but_ctx::Context,
     existing_branch: &gix::refs::FullNameRef,
+    dry_run: bool,
 ) -> anyhow::Result<but_workspace::branch::apply::Outcome<'static>> {
     let mut guard = ctx.exclusive_worktree_access();
-    apply_with_perm(ctx, existing_branch, guard.write_permission())
+    apply_with_perm(ctx, existing_branch, dry_run, guard.write_permission())
 }
 
 /// Apply `existing_branch` to the workspace under caller-held exclusive
@@ -163,20 +168,25 @@ pub fn apply(
 pub fn apply_with_perm(
     ctx: &mut but_ctx::Context,
     existing_branch: &gix::refs::FullNameRef,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<but_workspace::branch::apply::Outcome<'static>> {
-    // NOTE: since this is optional by nature, the same would be true if snapshotting/undo would be disabled via `ctx` app settings, for instance.
-    let maybe_oplog_entry = but_oplog::UnmaterializedOplogSnapshot::from_details_with_perm(
-        ctx,
-        SnapshotDetails::new(OperationKind::CreateBranch).with_trailers(vec![Trailer {
-            key: "name".into(),
-            value: existing_branch.to_string(),
-        }]),
-        perm.read_permission(),
-    )
-    .ok();
+    let maybe_oplog_entry = if dry_run {
+        None
+    } else {
+        // NOTE: since this is optional by nature, the same would be true if snapshotting/undo would be disabled via `ctx` app settings, for instance.
+        but_oplog::UnmaterializedOplogSnapshot::from_details_with_perm(
+            ctx,
+            SnapshotDetails::new(OperationKind::CreateBranch).with_trailers(vec![Trailer {
+                key: "name".into(),
+                value: existing_branch.to_string(),
+            }]),
+            perm.read_permission(),
+        )
+        .ok()
+    };
 
-    let res = apply_only_with_perm(ctx, existing_branch, perm);
+    let res = apply_only_with_perm(ctx, existing_branch, dry_run, perm);
     if let Some(snapshot) = maybe_oplog_entry.filter(|_| res.is_ok()) {
         snapshot.commit(ctx, perm).ok();
     }
@@ -206,9 +216,16 @@ pub fn move_branch(
     ctx: &mut but_ctx::Context,
     subject_branch: &gix::refs::FullNameRef,
     target_branch: &gix::refs::FullNameRef,
+    dry_run: bool,
 ) -> anyhow::Result<MoveBranchResult> {
     let mut guard = ctx.exclusive_worktree_access();
-    move_branch_with_perm(ctx, subject_branch, target_branch, guard.write_permission())
+    move_branch_with_perm(
+        ctx,
+        subject_branch,
+        target_branch,
+        dry_run,
+        guard.write_permission(),
+    )
 }
 
 /// Move `subject_branch` on top of `target_branch` under caller-held
@@ -217,51 +234,40 @@ pub fn move_branch(
 /// It prepares a best-effort move-branch oplog snapshot, rebases the subject
 /// branch onto the target branch, updates workspace metadata, and commits the
 /// snapshot only if the move succeeds. The returned [`MoveBranchResult`]
-/// contains the commit-id mapping produced by materializing the rebase. For
-/// lower-level implementation details, see
-/// [`but_workspace::branch::move_branch()`].
+/// contains the post-operation workspace view. For lower-level implementation
+/// details, see [`but_workspace::branch::move_branch()`].
 pub fn move_branch_with_perm(
     ctx: &mut but_ctx::Context,
     subject_branch: &gix::refs::FullNameRef,
     target_branch: &gix::refs::FullNameRef,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<MoveBranchResult> {
-    let maybe_oplog_entry = but_oplog::UnmaterializedOplogSnapshot::from_details_with_perm(
+    branch_mutation_with_snapshot(
         ctx,
-        SnapshotDetails::new(OperationKind::MoveBranch),
-        perm.read_permission(),
+        perm,
+        OperationKind::MoveBranch,
+        dry_run,
+        |ctx, perm| move_branch_impl_with_perm(ctx, subject_branch, target_branch, dry_run, perm),
     )
-    .ok();
-
-    let move_branch_result = move_branch_impl_with_perm(ctx, subject_branch, target_branch, perm);
-    if let Some(snapshot) = maybe_oplog_entry.filter(|_| move_branch_result.is_ok()) {
-        snapshot.commit(ctx, perm).ok();
-    }
-    move_branch_result
 }
 
 fn move_branch_impl_with_perm(
     ctx: &mut but_ctx::Context,
     subject_branch: &gix::refs::FullNameRef,
     target_branch: &gix::refs::FullNameRef,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<MoveBranchResult> {
-    let mut meta = ctx.meta()?;
-    let (repo, mut ws, _, _cache) = ctx.workspace_mut_and_db_and_cache_with_perm(perm)?;
-    let editor = Editor::create(&mut ws, &mut meta, &repo)?;
-    let but_workspace::branch::move_branch::Outcome { rebase, ws_meta } =
-        but_workspace::branch::move_branch(editor, subject_branch, target_branch)?;
-
-    let materialized = rebase.materialize()?;
-    if let Some((ws_meta, ref_name)) = ws_meta.zip(materialized.workspace.ref_name()) {
-        let mut md = materialized.meta.workspace(ref_name)?;
-        *md = ws_meta;
-        materialized.meta.set_workspace(&md)?;
-    }
-
-    Ok(MoveBranchResult {
-        replaced_commits: materialized.history.commit_mappings(),
-    })
+    branch_rebase_result_with_perm(
+        ctx,
+        perm,
+        dry_run,
+        BranchMutation::Move {
+            subject_branch,
+            target_branch,
+        },
+    )
 }
 
 /// Tears off a branch using the behavior described by [`tear_off_branch_with_perm()`].
@@ -273,9 +279,10 @@ fn move_branch_impl_with_perm(
 pub fn tear_off_branch(
     ctx: &mut but_ctx::Context,
     subject_branch: &gix::refs::FullNameRef,
+    dry_run: bool,
 ) -> anyhow::Result<MoveBranchResult> {
     let mut guard = ctx.exclusive_worktree_access();
-    tear_off_branch_with_perm(ctx, subject_branch, guard.write_permission())
+    tear_off_branch_with_perm(ctx, subject_branch, dry_run, guard.write_permission())
 }
 
 /// Removes `subject_branch` from its current stack, creating a new stack for
@@ -284,39 +291,109 @@ pub fn tear_off_branch(
 /// It prepares a best-effort tear-off oplog snapshot, performs the tear-off
 /// rebase and workspace metadata update under `perm`, and commits the snapshot
 /// only if the mutation succeeds. The returned [`MoveBranchResult`] contains
-/// the commit-id mapping produced by materializing the rebase. For lower-level
-/// implementation details, see [`but_workspace::branch::tear_off_branch()`].
+/// the post-operation workspace view. For lower-level implementation details,
+/// see [`but_workspace::branch::tear_off_branch()`].
 pub fn tear_off_branch_with_perm(
     ctx: &mut but_ctx::Context,
     subject_branch: &gix::refs::FullNameRef,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<MoveBranchResult> {
+    branch_mutation_with_snapshot(
+        ctx,
+        perm,
+        OperationKind::TearOffBranch,
+        dry_run,
+        |ctx, perm| tear_off_branch_impl_with_perm(ctx, subject_branch, dry_run, perm),
+    )
+}
+
+fn branch_mutation_with_snapshot<F>(
+    ctx: &mut but_ctx::Context,
+    perm: &mut RepoExclusive,
+    operation_kind: OperationKind,
+    dry_run: bool,
+    operation: F,
+) -> anyhow::Result<MoveBranchResult>
+where
+    F: FnOnce(&mut but_ctx::Context, &mut RepoExclusive) -> anyhow::Result<MoveBranchResult>,
+{
     let maybe_oplog_entry = but_oplog::UnmaterializedOplogSnapshot::from_details_with_perm(
         ctx,
-        SnapshotDetails::new(OperationKind::TearOffBranch),
+        SnapshotDetails::new(operation_kind),
         perm.read_permission(),
     )
     .ok();
 
-    let move_branch_result = tear_off_branch_impl_with_perm(ctx, subject_branch, perm);
-    if let Some(snapshot) = maybe_oplog_entry.filter(|_| move_branch_result.is_ok()) {
-        snapshot.commit(ctx, perm).ok();
-    }
-    move_branch_result
+    let result = operation(ctx, perm);
+    crate::commit_oplog_snapshot_if_success(dry_run, maybe_oplog_entry, ctx, perm, &result);
+
+    result
 }
 
 /// Move the branch, updating the workspace and the metadata.
 fn tear_off_branch_impl_with_perm(
     ctx: &mut but_ctx::Context,
     subject_branch: &gix::refs::FullNameRef,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<MoveBranchResult> {
-    let mut meta = ctx.meta()?;
-    let (repo, mut ws, _, _cache) = ctx.workspace_mut_and_db_and_cache_with_perm(perm)?;
-    let editor = Editor::create(&mut ws, &mut meta, &repo)?;
-    let but_workspace::branch::move_branch::Outcome { rebase, ws_meta } =
-        but_workspace::branch::tear_off_branch(editor, subject_branch, None)?;
+    branch_rebase_result_with_perm(
+        ctx,
+        perm,
+        dry_run,
+        BranchMutation::TearOff { subject_branch },
+    )
+}
 
+enum BranchMutation<'a> {
+    Move {
+        subject_branch: &'a gix::refs::FullNameRef,
+        target_branch: &'a gix::refs::FullNameRef,
+    },
+    TearOff {
+        subject_branch: &'a gix::refs::FullNameRef,
+    },
+}
+
+fn branch_rebase_result_with_perm(
+    ctx: &mut but_ctx::Context,
+    perm: &mut RepoExclusive,
+    dry_run: bool,
+    mutation: BranchMutation<'_>,
+) -> anyhow::Result<MoveBranchResult> {
+    let mut meta = ctx.meta()?;
+    let (repo, mut ws, _) = ctx.workspace_mut_and_db_with_perm(perm)?;
+    let mut cache = ctx.cache.get_cache_mut()?;
+    let editor = Editor::create(&mut ws, &mut meta, &repo)?;
+
+    let but_workspace::branch::move_branch::Outcome { rebase, ws_meta } = match mutation {
+        BranchMutation::Move {
+            subject_branch,
+            target_branch,
+        } => but_workspace::branch::move_branch(editor, subject_branch, target_branch)?,
+        BranchMutation::TearOff { subject_branch } => {
+            but_workspace::branch::tear_off_branch(editor, subject_branch, None)?
+        }
+    };
+
+    Ok(MoveBranchResult {
+        workspace: branch_workspace_from_rebase(rebase, ws_meta, &repo, &mut cache, dry_run)?,
+    })
+}
+
+fn branch_workspace_from_rebase<M: but_core::RefMetadata>(
+    rebase: SuccessfulRebase<'_, '_, M>,
+    ws_meta: Option<but_core::ref_metadata::Workspace>,
+    repo: &gix::Repository,
+    cache: &mut but_db::CacheHandle,
+    dry_run: bool,
+) -> anyhow::Result<crate::types::WorkspaceState> {
+    if dry_run {
+        return crate::workspace_state::from_successful_rebase(rebase, repo, cache, dry_run);
+    }
+
+    let graph = rebase.overlayed_graph()?;
     let materialized = rebase.materialize()?;
     if let Some((ws_meta, ref_name)) = ws_meta.zip(materialized.workspace.ref_name()) {
         let mut md = materialized.meta.workspace(ref_name)?;
@@ -324,7 +401,10 @@ fn tear_off_branch_impl_with_perm(
         materialized.meta.set_workspace(&md)?;
     }
 
-    Ok(MoveBranchResult {
-        replaced_commits: materialized.history.commit_mappings(),
-    })
+    crate::workspace_state::from_overlayed_graph(
+        graph,
+        repo,
+        cache,
+        materialized.history.commit_mappings(),
+    )
 }

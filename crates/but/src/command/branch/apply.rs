@@ -13,6 +13,7 @@ pub fn apply(mut ctx: Context, branch_name: &str, out: &mut OutputChannel) -> an
     let mut outcome = but_api::branch::apply_with_perm(
         &mut ctx,
         reference.name.as_ref(),
+        false,
         guard.write_permission(),
     )?;
 

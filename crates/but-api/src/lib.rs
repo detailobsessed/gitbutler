@@ -41,3 +41,23 @@ pub mod panic_capture;
 pub mod watcher;
 
 pub mod types;
+
+mod workspace_state;
+
+pub(crate) fn should_commit_oplog_snapshot(dry_run: bool) -> bool {
+    !dry_run
+}
+
+pub(crate) fn commit_oplog_snapshot_if_success<T, E>(
+    dry_run: bool,
+    maybe_snapshot: Option<but_oplog::UnmaterializedOplogSnapshot>,
+    ctx: &mut but_ctx::Context,
+    perm: &mut but_ctx::access::RepoExclusive,
+    result: &Result<T, E>,
+) {
+    if should_commit_oplog_snapshot(dry_run)
+        && let Some(snapshot) = maybe_snapshot.filter(|_| result.is_ok())
+    {
+        snapshot.commit(ctx, perm).ok();
+    }
+}

@@ -53,7 +53,7 @@ pub mod commit;
 ///
 /// Note that many of these types should eventually end up in the crate root.
 pub mod ref_info;
-pub use ref_info::function::{head_info, ref_info};
+pub use ref_info::function::{head_info, ref_info, ref_info_from_graph};
 
 mod branch_details;
 pub use branch_details::{branch_details, local_commits_for_branch};

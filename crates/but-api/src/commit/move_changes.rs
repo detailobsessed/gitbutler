@@ -19,6 +19,7 @@ pub fn commit_move_changes_between_only(
     source_commit_id: gix::ObjectId,
     destination_commit_id: gix::ObjectId,
     changes: Vec<but_core::DiffSpec>,
+    dry_run: bool,
 ) -> anyhow::Result<MoveChangesResult> {
     let mut guard = ctx.exclusive_worktree_access();
     commit_move_changes_between_only_with_perm(
@@ -26,6 +27,7 @@ pub fn commit_move_changes_between_only(
         source_commit_id,
         destination_commit_id,
         changes,
+        dry_run,
         guard.write_permission(),
     )
 }
@@ -41,11 +43,13 @@ pub fn commit_move_changes_between_only_with_perm(
     source_commit_id: gix::ObjectId,
     destination_commit_id: gix::ObjectId,
     changes: Vec<but_core::DiffSpec>,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<MoveChangesResult> {
     let context_lines = ctx.settings.context_lines;
     let mut meta = ctx.meta()?;
     let (repo, mut ws, _, _cache) = ctx.workspace_mut_and_db_and_cache_with_perm(perm)?;
+    let mut cache = ctx.cache.get_cache_mut()?;
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
 
     let outcome = but_workspace::commit::move_changes_between_commits(
@@ -55,11 +59,10 @@ pub fn commit_move_changes_between_only_with_perm(
         changes,
         context_lines,
     )?;
-    let materialized = outcome.rebase.materialize()?;
+    let workspace =
+        crate::workspace_state::from_successful_rebase(outcome.rebase, &repo, &mut cache, dry_run)?;
 
-    Ok(MoveChangesResult {
-        replaced_commits: materialized.history.commit_mappings(),
-    })
+    Ok(MoveChangesResult { workspace })
 }
 
 /// Moves `changes` from `source_commit_id` to `destination_commit_id` and
@@ -76,6 +79,7 @@ pub fn commit_move_changes_between(
     source_commit_id: gix::ObjectId,
     destination_commit_id: gix::ObjectId,
     changes: Vec<but_core::DiffSpec>,
+    dry_run: bool,
 ) -> anyhow::Result<MoveChangesResult> {
     let mut guard = ctx.exclusive_worktree_access();
     commit_move_changes_between_with_perm(
@@ -83,6 +87,7 @@ pub fn commit_move_changes_between(
         source_commit_id,
         destination_commit_id,
         changes,
+        dry_run,
         guard.write_permission(),
     )
 }
@@ -100,6 +105,7 @@ pub fn commit_move_changes_between_with_perm(
     source_commit_id: gix::ObjectId,
     destination_commit_id: gix::ObjectId,
     changes: Vec<but_core::DiffSpec>,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<MoveChangesResult> {
     let maybe_oplog_entry = but_oplog::UnmaterializedOplogSnapshot::from_details_with_perm(
@@ -114,10 +120,9 @@ pub fn commit_move_changes_between_with_perm(
         source_commit_id,
         destination_commit_id,
         changes,
+        dry_run,
         perm,
     );
-    if let Some(snapshot) = maybe_oplog_entry.filter(|_| res.is_ok()) {
-        snapshot.commit(ctx, perm).ok();
-    };
+    crate::commit_oplog_snapshot_if_success(dry_run, maybe_oplog_entry, ctx, perm, &res);
     res
 }

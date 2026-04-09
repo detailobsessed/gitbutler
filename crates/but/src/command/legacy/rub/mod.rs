@@ -288,7 +288,7 @@ impl<'a> UncommittedToCommitOperation<'a> {
             .map(DiffSpec::from)
             .collect::<Vec<_>>();
         let changes = but_workspace::flatten_diff_specs(changes);
-        but_api::commit::amend::commit_amend(ctx, self.oid, changes)
+        but_api::commit::amend::commit_amend(ctx, self.oid, changes, false)
     }
 }
 
@@ -450,7 +450,7 @@ impl UnassignedToCommitOperation {
     /// Executes `UnassignedToCommit` and returns the exact commit-amend API result.
     pub(crate) fn execute_inner(&self, ctx: &mut Context) -> anyhow::Result<CommitCreateResult> {
         let changes = changes_for_stack_assignment(ctx, None)?;
-        but_api::commit::amend::commit_amend(ctx, self.oid, changes)
+        but_api::commit::amend::commit_amend(ctx, self.oid, changes, false)
     }
 }
 
@@ -522,7 +522,7 @@ impl UndoCommitOperation {
 
     /// Executes `UndoCommit` by uncommitting all changes from the selected commit.
     pub(crate) fn execute_inner(&self, ctx: &mut Context) -> anyhow::Result<CommitUndoResult> {
-        but_api::commit::undo::commit_undo(ctx, self.oid)
+        but_api::commit::undo::commit_undo(ctx, self.oid, false)
     }
 }
 
@@ -550,7 +550,7 @@ impl SquashCommitsOperation {
 
     /// Executes `SquashCommits` by squashing source into target.
     pub(crate) fn execute_inner(&self, ctx: &mut Context) -> anyhow::Result<CommitSquashResult> {
-        but_api::commit::squash::commit_squash(ctx, self.source, self.destination)
+        but_api::commit::squash::commit_squash(ctx, self.source, self.destination, false)
     }
 }
 
@@ -580,6 +580,7 @@ impl<'a> MoveCommitToBranchOperation<'a> {
             self.oid,
             RelativeTo::Reference(target_full_name),
             InsertSide::Below,
+            false,
         )
     }
 }
@@ -669,7 +670,7 @@ impl<'a> BranchToCommitOperation<'a> {
     pub(crate) fn execute_inner(&self, ctx: &mut Context) -> anyhow::Result<CommitCreateResult> {
         let stack_id = stack_id_for_branch_name(ctx, self.name)?;
         let changes = changes_for_stack_assignment(ctx, stack_id)?;
-        but_api::commit::amend::commit_amend(ctx, self.oid, changes)
+        but_api::commit::amend::commit_amend(ctx, self.oid, changes, false)
     }
 }
 
@@ -722,6 +723,7 @@ impl<'a> CommittedFileToBranchOperation<'a> {
             self.commit_oid,
             relevant_changes,
             stack_id,
+            false,
         )
     }
 }
@@ -746,6 +748,7 @@ impl<'a> CommittedFileToCommitOperation<'a> {
             self.commit_oid,
             self.oid,
             relevant_changes,
+            false,
         )
     }
 }
@@ -770,6 +773,7 @@ impl<'a> CommittedFileToUnassignedOperation<'a> {
             self.commit_oid,
             relevant_changes,
             None,
+            false,
         )
     }
 }
@@ -1218,7 +1222,7 @@ pub(crate) fn handle_uncommit(
         for source in sources {
             match source {
                 CliId::Commit { commit_id, .. } => {
-                    but_api::commit::discard_commit::commit_discard(ctx, commit_id)?;
+                    but_api::commit::discard_commit::commit_discard(ctx, commit_id, false)?;
 
                     if !json_mode && let Some(out) = out.for_human() {
                         let repo = ctx.repo.get()?;

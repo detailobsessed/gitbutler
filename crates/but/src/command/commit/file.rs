@@ -20,6 +20,7 @@ pub fn commited_file_to_another_commit_with_perm(
         source_id,
         target_id,
         relevant_changes,
+        false,
         perm,
     )?;
 
@@ -68,6 +69,7 @@ pub fn uncommit_file_and_discard_with_perm(
         source_id,
         relevant_changes.clone(),
         None,
+        false,
         perm,
     )?;
 

@@ -18,31 +18,33 @@ pub fn commit_insert_blank_only(
     ctx: &mut but_ctx::Context,
     #[but_api(crate::commit::json::RelativeTo)] relative_to: RelativeTo,
     side: InsertSide,
+    dry_run: bool,
 ) -> anyhow::Result<CommitInsertBlankResult> {
     let mut guard = ctx.exclusive_worktree_access();
-    commit_insert_blank_only_impl(ctx, relative_to, side, guard.write_permission())
+    commit_insert_blank_only_impl(ctx, relative_to, side, dry_run, guard.write_permission())
 }
 
 pub(crate) fn commit_insert_blank_only_impl(
     ctx: &mut but_ctx::Context,
     relative_to: RelativeTo,
     side: InsertSide,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<CommitInsertBlankResult> {
     let mut meta = ctx.meta()?;
-    let (repo, mut ws, _, _cache) = ctx.workspace_mut_and_db_and_cache_with_perm(perm)?;
+    let (repo, mut ws, _) = ctx.workspace_mut_and_db_with_perm(perm)?;
+    let mut cache = ctx.cache.get_cache_mut()?;
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
 
-    let (outcome, blank_commit_selector) =
+    let (rebase, blank_commit_selector) =
         but_workspace::commit::insert_blank_commit(editor, side, relative_to)?;
-
-    let outcome = outcome.materialize()?;
-    let id = outcome.lookup_pick(blank_commit_selector)?;
-    let replaced_commits = outcome.history.commit_mappings();
+    let new_commit = rebase.lookup_pick(blank_commit_selector)?;
+    let workspace =
+        crate::workspace_state::from_successful_rebase(rebase, &repo, &mut cache, dry_run)?;
 
     Ok(CommitInsertBlankResult {
-        new_commit: id,
-        replaced_commits,
+        new_commit,
+        workspace,
     })
 }
 
@@ -56,9 +58,10 @@ pub fn commit_insert_blank(
     ctx: &mut but_ctx::Context,
     #[but_api(crate::commit::json::RelativeTo)] relative_to: RelativeTo,
     side: InsertSide,
+    dry_run: bool,
 ) -> anyhow::Result<CommitInsertBlankResult> {
     let mut guard = ctx.exclusive_worktree_access();
-    commit_insert_blank_with_perm(ctx, relative_to, side, guard.write_permission())
+    commit_insert_blank_with_perm(ctx, relative_to, side, dry_run, guard.write_permission())
 }
 
 /// Create an empty commit next to `relative_to` under caller-held exclusive
@@ -73,6 +76,7 @@ pub fn commit_insert_blank_with_perm(
     ctx: &mut but_ctx::Context,
     relative_to: RelativeTo,
     side: InsertSide,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<CommitInsertBlankResult> {
     let maybe_oplog_entry = but_oplog::UnmaterializedOplogSnapshot::from_details_with_perm(
@@ -82,9 +86,7 @@ pub fn commit_insert_blank_with_perm(
     )
     .ok();
 
-    let res = commit_insert_blank_only_impl(ctx, relative_to, side, perm);
-    if let Some(snapshot) = maybe_oplog_entry.filter(|_| res.is_ok()) {
-        snapshot.commit(ctx, perm).ok();
-    };
+    let res = commit_insert_blank_only_impl(ctx, relative_to, side, dry_run, perm);
+    crate::commit_oplog_snapshot_if_success(dry_run, maybe_oplog_entry, ctx, perm, &res);
     res
 }

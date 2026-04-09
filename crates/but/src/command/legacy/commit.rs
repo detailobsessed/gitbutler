@@ -65,6 +65,7 @@ pub(crate) fn insert_blank_commit(
                 ctx,
                 RelativeTo::Commit(*oid),
                 insert_side,
+                false,
                 guard.write_permission(),
             )?;
             format!("Created blank commit {position_desc} commit {short_oid}")
@@ -78,6 +79,7 @@ pub(crate) fn insert_blank_commit(
                 ctx,
                 RelativeTo::Reference(reference.name),
                 insert_side,
+                false,
                 guard.write_permission(),
             )?;
             match insert_side {
@@ -479,6 +481,7 @@ pub(crate) fn commit(
         InsertSide::Below,
         diff_specs,
         final_commit_message,
+        false,
         guard.write_permission(),
     )?;
 

@@ -25,7 +25,7 @@ export declare function absorptionPlan(projectId: string, target: AbsorptionTarg
  * This acquires exclusive worktree access from `ctx`, applies
  * `existing_branch`, and records an oplog snapshot on success.
  */
-export declare function apply(projectId: string, existingBranch: string): Promise<ApplyOutcome>
+export declare function apply(projectId: string, existingBranch: string, dryRun: boolean): Promise<ApplyOutcome>
 
 /**
  * Persists `assignments` for the current workspace and records an oplog
@@ -78,7 +78,7 @@ export declare function changesInWorktreeWithPerm(projectId: string): Promise<Wo
  * lower-level implementation details, see
  * [`but_workspace::commit::commit_amend()`].
  */
-export declare function commitAmend(projectId: string, commitId: string, changes: Array<DiffSpec>): Promise<CommitCreateResult>
+export declare function commitAmend(projectId: string, commitId: string, changes: Array<DiffSpec>, dryRun: boolean): Promise<CommitCreateResult>
 
 /**
  * Insert a new commit built from `changes` and record an oplog snapshot on
@@ -90,7 +90,7 @@ export declare function commitAmend(projectId: string, commitId: string, changes
  * lower-level implementation details, see
  * [`but_workspace::commit::commit_create()`].
  */
-export declare function commitCreate(projectId: string, relativeTo: RelativeTo, side: InsertSide, changes: Array<DiffSpec>, message: string): Promise<CommitCreateResult>
+export declare function commitCreate(projectId: string, relativeTo: RelativeTo, side: InsertSide, changes: Array<DiffSpec>, message: string, dryRun: boolean): Promise<CommitCreateResult>
 
 /**
  * Computes commit details for `commit_id` with line statistics enabled.
@@ -104,7 +104,7 @@ export declare function commitDetailsWithLineStats(projectId: string, commitId: 
  * Discard `subject_commit_id` using the behavior described by
  * [`commit_discard_with_perm()`].
  */
-export declare function commitDiscard(projectId: string, subjectCommitId: string): Promise<CommitDiscardResult>
+export declare function commitDiscard(projectId: string, subjectCommitId: string, dryRun: boolean): Promise<CommitDiscardResult>
 
 /**
  * Inserts a blank commit on `side` of `relative_to` and records an oplog
@@ -112,7 +112,7 @@ export declare function commitDiscard(projectId: string, subjectCommitId: string
  *
  * For details, see [`commit_insert_blank_with_perm()`].
  */
-export declare function commitInsertBlank(projectId: string, relativeTo: RelativeTo, side: InsertSide): Promise<CommitInsertBlankResult>
+export declare function commitInsertBlank(projectId: string, relativeTo: RelativeTo, side: InsertSide, dryRun: boolean): Promise<CommitInsertBlankResult>
 
 /**
  * Moves `subject_commit_id` to `side` of `relative_to` and records an oplog
@@ -123,7 +123,7 @@ export declare function commitInsertBlank(projectId: string, relativeTo: Relativ
  *
  * For details, see [`commit_move_with_perm()`].
  */
-export declare function commitMove(projectId: string, subjectCommitId: string, relativeTo: RelativeTo, side: InsertSide): Promise<CommitMoveResult>
+export declare function commitMove(projectId: string, subjectCommitId: string, relativeTo: RelativeTo, side: InsertSide, dryRun: boolean): Promise<CommitMoveResult>
 
 /**
  * Moves `changes` from `source_commit_id` to `destination_commit_id` and
@@ -134,7 +134,7 @@ export declare function commitMove(projectId: string, subjectCommitId: string, r
  *
  * For details, see [`commit_move_changes_between_with_perm()`].
  */
-export declare function commitMoveChangesBetween(projectId: string, sourceCommitId: string, destinationCommitId: string, changes: Array<DiffSpec>): Promise<MoveChangesResult>
+export declare function commitMoveChangesBetween(projectId: string, sourceCommitId: string, destinationCommitId: string, changes: Array<DiffSpec>, dryRun: boolean): Promise<MoveChangesResult>
 
 /**
  * Reword `commit_id` to `message` using the behavior described by
@@ -143,7 +143,7 @@ export declare function commitMoveChangesBetween(projectId: string, sourceCommit
  * This acquires exclusive worktree access from `ctx` before rewriting the
  * commit message and recording the oplog entry.
  */
-export declare function commitReword(projectId: string, commitId: string, message: string): Promise<CommitRewordResult>
+export declare function commitReword(projectId: string, commitId: string, message: string, dryRun: boolean): Promise<CommitRewordResult>
 
 /**
  * Squash `subject_commit_id` into `target_commit_id` and record an oplog
@@ -154,7 +154,7 @@ export declare function commitReword(projectId: string, commitId: string, messag
  *
  * For details, see [`commit_squash_with_perm()`].
  */
-export declare function commitSquash(projectId: string, subjectCommitId: string, targetCommitId: string): Promise<CommitSquashResult>
+export declare function commitSquash(projectId: string, subjectCommitId: string, targetCommitId: string, dryRun: boolean): Promise<CommitSquashResult>
 
 /**
  * Extract `changes` from `commit_id` and record the rewrite in the oplog.
@@ -164,10 +164,13 @@ export declare function commitSquash(projectId: string, subjectCommitId: string,
  *
  * See [`commit_uncommit_changes_with_perm()`] for details.
  */
-export declare function commitUncommitChanges(projectId: string, commitId: string, changes: Array<DiffSpec>, assignTo: string | null): Promise<MoveChangesResult>
+export declare function commitUncommitChanges(projectId: string, commitId: string, changes: Array<DiffSpec>, assignTo: string | null, dryRun: boolean): Promise<MoveChangesResult>
 
-/** Undo `subject_commit_id` using the behavior described by [`commit_undo_only_with_perm()`]. */
-export declare function commitUndo(projectId: string, subjectCommitId: string): Promise<CommitUndoResult>
+/**
+ * Undo `subject_commit_id` using the behavior described by
+ * [`commit_undo_only_with_perm()`].
+ */
+export declare function commitUndo(projectId: string, subjectCommitId: string, dryRun: boolean): Promise<CommitUndoResult>
 
 /**
  * Get the forge provider name.
@@ -202,7 +205,7 @@ export declare function mergeReview(projectId: string, reviewId: number): Promis
  * This acquires exclusive worktree access from `ctx`, moves `subject_branch`
  * on top of `target_branch`, and records an oplog snapshot on success.
  */
-export declare function moveBranch(projectId: string, subjectBranch: string, targetBranch: string): Promise<MoveBranchResult>
+export declare function moveBranch(projectId: string, subjectBranch: string, targetBranch: string, dryRun: boolean): Promise<MoveBranchResult>
 
 export declare function publishReview(projectId: string, params: CreateForgeReviewParams): Promise<ForgeReview>
 
@@ -245,7 +248,7 @@ export declare function setReviewTemplate(projectId: string, templatePath: strin
  * This acquires exclusive worktree access from `ctx`, tears `subject_branch`
  * out of its current stack, and records an oplog snapshot on success.
  */
-export declare function tearOffBranch(projectId: string, subjectBranch: string): Promise<MoveBranchResult>
+export declare function tearOffBranch(projectId: string, subjectBranch: string, dryRun: boolean): Promise<MoveBranchResult>
 
 /**
  * Produces a unified patch for `change`.
@@ -603,11 +606,8 @@ export type CommitCreateResult = {
   newCommit?: string | null;
   /** Changes that were rejected during commit creation. */
   rejectedChanges: Array<RejectedChange>;
-  /**
-   * Commits that have been replaced as a side-effect of the create/amend.
-   * Maps `oldId -> newId`.
-   */
-  replacedCommits: Record<string, string>;
+  /** Workspace state after the create or amend. */
+  workspace: WorkspaceState;
 };
 
 /** The JSON sibling of [but_core::diff::CommitDetails]. */
@@ -626,53 +626,38 @@ export type CommitDetails = {
 export type CommitDiscardResult = {
   /** The commit that was discarded as a result of this operation. */
   discardedCommit: string;
-  /**
-   * Commits that have been replaced as a side-effect of the commit discard.
-   * Maps `oldId -> newId`.
-   */
-  replacedCommits: Record<string, string>;
+  /** Workspace state after discarding the commit. */
+  workspace: WorkspaceState;
 };
 
 /** JSON transport type for inserting a blank commit. */
 export type CommitInsertBlankResult = {
   /** The new blank commit ID. */
   newCommit: string;
-  /**
-   * Commits that have been replaced as a side-effect of the insertion.
-   * Maps `oldId -> newId`.
-   */
-  replacedCommits: Record<string, string>;
+  /** Workspace state after inserting the blank commit. */
+  workspace: WorkspaceState;
 };
 
 /** JSON transport type for moving a commit. */
 export type CommitMoveResult = {
-  /**
-   * Commits that have been replaced as a side-effect of the move.
-   * Maps `oldId -> newId`.
-   */
-  replacedCommits: Record<string, string>;
+  /** Workspace state after moving the commit. */
+  workspace: WorkspaceState;
 };
 
 /** JSON transport type for rewording a commit. */
 export type CommitRewordResult = {
   /** The new commit ID after rewording. */
   newCommit: string;
-  /**
-   * Commits that have been replaced as a side-effect of the reword.
-   * Maps `oldId -> newId`.
-   */
-  replacedCommits: Record<string, string>;
+  /** Workspace state after the reword. */
+  workspace: WorkspaceState;
 };
 
 /** JSON transport type for squashing commits. */
 export type CommitSquashResult = {
   /** The new commit ID after squashing. */
   newCommit: string;
-  /**
-   * Commits that have been replaced as a side-effect of the squash.
-   * Maps `oldId -> newId`.
-   */
-  replacedCommits: Record<string, string>;
+  /** Workspace state after the squash. */
+  workspace: WorkspaceState;
 };
 
 /** Represents the state a commit could be in. */
@@ -689,8 +674,8 @@ export type CommitState = {
 export type CommitUndoResult = {
   /** The ID of the commit that was undone. */
   undoneCommit: string;
-  /** Commits that were replaced by this operation. Maps `old_id -> new_id`. */
-  replacedCommits: Record<string, string>;
+  /** Workspace state after undoing the commit. */
+  workspace: WorkspaceState;
 };
 
 /** Represents what was causing a particular commit to conflict when rebased. */
@@ -1081,20 +1066,14 @@ export type ModeFlags = "ExecutableBitAdded" | "ExecutableBitRemoved" | "TypeCha
 
 /** JSON transport type for moving a branch. */
 export type MoveBranchResult = {
-  /**
-   * Commits that have been replaced after transplanting a branch.
-   * Maps `oldId → newId`.
-   */
-  replacedCommits: Record<string, string>;
+  /** Workspace state after moving or tearing off a branch. */
+  workspace: WorkspaceState;
 };
 
 /** JSON transport type for moving changes between commits. */
 export type MoveChangesResult = {
-  /**
-   * Commits that have been mapped from one thing to another.
-   * Maps `oldId -> newId`.
-   */
-  replacedCommits: Record<string, string>;
+  /** Workspace state after moving changes. */
+  workspace: WorkspaceState;
 };
 
 export type OperatingMode = {
@@ -1527,6 +1506,14 @@ export type WatcherPayload = {
 export type WatcherWorktreeChangesPayload = {
   /** The file changes in the repository. */
   changes: WorktreeChanges;
+};
+
+/** Shared JSON transport type for mutation workspace results. */
+export type WorkspaceState = {
+  /** Commits that were replaced by the operation. Maps `oldId -> newId`. */
+  replacedCommits: Record<string, string>;
+  /** The post-operation workspace view presented to the frontend. */
+  headInfo: RefInfo;
 };
 
 /** Same as `but_core::ui::WorktreeChanges`, but with the addition of hunk assignments. */

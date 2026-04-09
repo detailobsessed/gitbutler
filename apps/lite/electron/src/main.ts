@@ -71,8 +71,8 @@ function registerIpcHandlers(): void {
 	ipcMain.handle(liteIpcChannels.absorb, (_e, { projectId, absorptionPlan }: AbsorbParams) =>
 		absorb(projectId, absorptionPlan),
 	);
-	ipcMain.handle(liteIpcChannels.apply, (_e, { projectId, existingBranch }: ApplyParams) =>
-		apply(projectId, existingBranch),
+	ipcMain.handle(liteIpcChannels.apply, (_e, { projectId, existingBranch, dryRun }: ApplyParams) =>
+		apply(projectId, existingBranch, dryRun),
 	);
 	ipcMain.handle(liteIpcChannels.assignHunk, (_e, { projectId, assignments }: AssignHunkParams) =>
 		assignHunk(projectId, assignments),
@@ -90,18 +90,18 @@ function registerIpcHandlers(): void {
 	);
 	ipcMain.handle(
 		liteIpcChannels.commitAmend,
-		(_e, { projectId, commitId, changes }: CommitAmendParams) =>
-			commitAmend(projectId, commitId, changes),
+		(_e, { projectId, commitId, changes, dryRun }: CommitAmendParams) =>
+			commitAmend(projectId, commitId, changes, dryRun),
 	);
 	ipcMain.handle(
 		liteIpcChannels.commitCreate,
-		(_e, { projectId, relativeTo, side, changes, message }: CommitCreateParams) =>
-			commitCreate(projectId, relativeTo, side, changes, message),
+		(_e, { projectId, relativeTo, side, changes, message, dryRun }: CommitCreateParams) =>
+			commitCreate(projectId, relativeTo, side, changes, message, dryRun),
 	);
 	ipcMain.handle(
 		liteIpcChannels.commitDiscard,
-		(_e, { projectId, subjectCommitId }: CommitDiscardParams) =>
-			commitDiscard(projectId, subjectCommitId),
+		(_e, { projectId, subjectCommitId, dryRun }: CommitDiscardParams) =>
+			commitDiscard(projectId, subjectCommitId, dryRun),
 	);
 	ipcMain.handle(
 		liteIpcChannels.commitDetailsWithLineStats,
@@ -110,35 +110,41 @@ function registerIpcHandlers(): void {
 	);
 	ipcMain.handle(
 		liteIpcChannels.commitInsertBlank,
-		(_e, { projectId, relativeTo, side }: CommitInsertBlankParams) =>
-			commitInsertBlank(projectId, relativeTo, side),
+		(_e, { projectId, relativeTo, side, dryRun }: CommitInsertBlankParams) =>
+			commitInsertBlank(projectId, relativeTo, side, dryRun),
 	);
 	ipcMain.handle(
 		liteIpcChannels.commitMove,
-		(_e, { projectId, subjectCommitId, relativeTo, side }: CommitMoveParams) =>
-			commitMove(projectId, subjectCommitId, relativeTo, side),
+		(_e, { projectId, subjectCommitId, relativeTo, side, dryRun }: CommitMoveParams) =>
+			commitMove(projectId, subjectCommitId, relativeTo, side, dryRun),
 	);
 	ipcMain.handle(
 		liteIpcChannels.commitSquash,
-		(_e, { projectId, sourceCommitId, destinationCommitId }: CommitSquashParams) =>
-			commitSquash(projectId, sourceCommitId, destinationCommitId),
+		(_e, { projectId, sourceCommitId, destinationCommitId, dryRun }: CommitSquashParams) =>
+			commitSquash(projectId, sourceCommitId, destinationCommitId, dryRun),
 	);
 	ipcMain.handle(
 		liteIpcChannels.commitReword,
-		(_e, { projectId, commitId, message }: CommitRewordParams) =>
-			commitReword(projectId, commitId, message),
+		(_e, { projectId, commitId, message, dryRun }: CommitRewordParams) =>
+			commitReword(projectId, commitId, message, dryRun),
 	);
 	ipcMain.handle(
 		liteIpcChannels.commitMoveChangesBetween,
 		(
 			_e,
-			{ projectId, sourceCommitId, destinationCommitId, changes }: CommitMoveChangesBetweenParams,
-		) => commitMoveChangesBetween(projectId, sourceCommitId, destinationCommitId, changes),
+			{
+				projectId,
+				sourceCommitId,
+				destinationCommitId,
+				changes,
+				dryRun,
+			}: CommitMoveChangesBetweenParams,
+		) => commitMoveChangesBetween(projectId, sourceCommitId, destinationCommitId, changes, dryRun),
 	);
 	ipcMain.handle(
 		liteIpcChannels.commitUncommitChanges,
-		(_e, { projectId, commitId, changes, assignTo }: CommitUncommitChangesParams) =>
-			commitUncommitChanges(projectId, commitId, changes, assignTo),
+		(_e, { projectId, commitId, changes, assignTo, dryRun }: CommitUncommitChangesParams) =>
+			commitUncommitChanges(projectId, commitId, changes, assignTo, dryRun),
 	);
 	ipcMain.handle(liteIpcChannels.getVersion, () => Promise.resolve(app.getVersion()));
 	ipcMain.handle(liteIpcChannels.headInfo, (_e, projectId: string) => headInfo(projectId));
@@ -149,8 +155,8 @@ function registerIpcHandlers(): void {
 	ipcMain.handle(liteIpcChannels.listProjects, () => listProjectsStateless());
 	ipcMain.handle(
 		liteIpcChannels.moveBranch,
-		(_e, { projectId, subjectBranch, targetBranch }: MoveBranchParams) =>
-			moveBranch(projectId, subjectBranch, targetBranch),
+		(_e, { projectId, subjectBranch, targetBranch, dryRun }: MoveBranchParams) =>
+			moveBranch(projectId, subjectBranch, targetBranch, dryRun),
 	);
 	ipcMain.handle(
 		liteIpcChannels.updateBranchName,
@@ -159,8 +165,8 @@ function registerIpcHandlers(): void {
 	);
 	ipcMain.handle(
 		liteIpcChannels.tearOffBranch,
-		(_e, { projectId, subjectBranch }: TearOffBranchParams) =>
-			tearOffBranch(projectId, subjectBranch),
+		(_e, { projectId, subjectBranch, dryRun }: TearOffBranchParams) =>
+			tearOffBranch(projectId, subjectBranch, dryRun),
 	);
 	ipcMain.handle(liteIpcChannels.ping, (_event, input: string) =>
 		Promise.resolve(`pong: ${input}`),

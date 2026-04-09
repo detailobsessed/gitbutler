@@ -245,6 +245,7 @@ export const getCombineOperation = ({
 							commitSquashOperation({
 								sourceCommitId,
 								destinationCommitId,
+								dryRun: false,
 							}),
 					}),
 				),
@@ -275,6 +276,7 @@ export const getCombineOperation = ({
 										commitAmendOperation({
 											commitId,
 											changes,
+											dryRun: false,
 										}),
 								}),
 							),
@@ -286,12 +288,14 @@ export const getCombineOperation = ({
 											commitId: sourceCommitId,
 											assignTo: stackId,
 											changes,
+											dryRun: false,
 										}),
 									Commit: ({ commitId: destinationCommitId }) =>
 										commitMoveChangesBetweenOperation({
 											sourceCommitId,
 											destinationCommitId,
 											changes,
+											dryRun: false,
 										}),
 								}),
 							),
@@ -317,6 +321,7 @@ export const getCommitTargetMoveOperation = ({
 					subjectCommitId,
 					relativeTo: { type: "commit", subject: commitId },
 					side,
+					dryRun: false,
 				}),
 			TreeChanges: ({ parent, changes: sourceChanges }) => {
 				const changes = sourceChanges.map(({ change, hunkHeaders }) =>
@@ -331,6 +336,7 @@ export const getCommitTargetMoveOperation = ({
 								side,
 								changes,
 								message: "",
+								dryRun: false,
 							}),
 						Commit: ({ commitId: sourceCommitId }) =>
 							commitCreateFromCommittedChangesOperation({
@@ -338,6 +344,7 @@ export const getCommitTargetMoveOperation = ({
 								relativeTo: { type: "commit", subject: commitId },
 								side,
 								changes,
+								dryRun: false,
 							}),
 					}),
 					Match.exhaustive,
@@ -361,6 +368,7 @@ export const getBranchTargetOperation = ({
 				return moveBranchOperation({
 					subjectBranch: decodeRefName(source.branchRef),
 					targetBranch: decodeRefName(branchRef),
+					dryRun: false,
 				});
 			},
 			Commit: ({ commitId }) =>
@@ -371,6 +379,7 @@ export const getBranchTargetOperation = ({
 						subject: branchRef,
 					},
 					side: "below",
+					dryRun: false,
 				}),
 			TreeChanges: (source) => {
 				const changes = source.changes.map(({ change, hunkHeaders }) =>
@@ -385,6 +394,7 @@ export const getBranchTargetOperation = ({
 								side: "below",
 								changes,
 								message: "",
+								dryRun: false,
 							}),
 						Commit: ({ commitId: sourceCommitId }) =>
 							commitCreateFromCommittedChangesOperation({
@@ -392,6 +402,7 @@ export const getBranchTargetOperation = ({
 								relativeTo: { type: "referenceBytes", subject: branchRef },
 								side: "below",
 								changes,
+								dryRun: false,
 							}),
 					}),
 				);
@@ -408,5 +419,6 @@ export const getTearOffBranchTargetOperation = (
 
 	return tearOffBranchOperation({
 		subjectBranch: decodeRefName(resolvedOperationSource.branchRef),
+		dryRun: false,
 	});
 };

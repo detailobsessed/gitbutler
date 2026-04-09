@@ -157,13 +157,13 @@
 	}
 
 	async function uncommitChanges(stackId: string, commitId: string, changes: TreeChange[]) {
-		const { replacedCommits } = await stackService.uncommitChanges({
+		const { workspace } = await stackService.uncommitChanges({
 			projectId,
 			stackId,
 			commitId,
 			changes: changesToDiffSpec(changes),
 		});
-		const newCommitId = replacedCommits.find(([before]) => before === commitId)?.[1];
+		const newCommitId = workspace.replacedCommits[commitId];
 		const branchName = uiState.lane(stackId).selection.current?.branchName;
 		const selectedFiles = changes.map((change) => ({ ...selectionId, path: change.path }));
 

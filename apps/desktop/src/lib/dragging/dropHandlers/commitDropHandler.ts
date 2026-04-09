@@ -111,7 +111,7 @@ export class AmendCommitWithChangeDzHandler implements DropzoneHandler {
 				const sourceCommitId = data.selectionId.commitId;
 				const changes = changesToDiffSpec(await data.treeChanges());
 				if (sourceStackId && sourceCommitId) {
-					const { replacedCommits } = await this.stackService.moveChangesBetweenCommits({
+					const { workspace } = await this.stackService.moveChangesBetweenCommits({
 						projectId: this.projectId,
 						destinationStackId: this.stackId,
 						destinationCommitId: this.commit.id,
@@ -121,8 +121,8 @@ export class AmendCommitWithChangeDzHandler implements DropzoneHandler {
 					});
 
 					// Update the project state to point to the new commit if needed.
-					updateUiState(this.uiState, sourceStackId, sourceCommitId, replacedCommits);
-					updateUiState(this.uiState, this.stackId, this.commit.id, replacedCommits);
+					updateUiState(this.uiState, sourceStackId, sourceCommitId, workspace.replacedCommits);
+					updateUiState(this.uiState, this.stackId, this.commit.id, workspace.replacedCommits);
 				} else {
 					throw new Error("Change drop data must specify the source stackId");
 				}
@@ -189,7 +189,7 @@ export class UncommitDzHandler implements DropzoneHandler {
 					const commitId = data.selectionId.commitId;
 					if (stackId && commitId) {
 						const changes = changesToDiffSpec(await data.treeChanges());
-						const { replacedCommits } = await this.stackService.uncommitChanges({
+						const { workspace } = await this.stackService.uncommitChanges({
 							projectId: this.projectId,
 							stackId,
 							commitId,
@@ -198,7 +198,7 @@ export class UncommitDzHandler implements DropzoneHandler {
 						});
 
 						// Update the project state to point to the new commit if needed.
-						updateUiState(this.uiState, stackId, commitId, replacedCommits);
+						updateUiState(this.uiState, stackId, commitId, workspace.replacedCommits);
 					} else {
 						throw new Error("Change drop data must specify the source stackId");
 					}
@@ -218,7 +218,7 @@ export class UncommitDzHandler implements DropzoneHandler {
 			const previousPathBytes =
 				data.change.status.type === "Rename" ? data.change.status.subject.previousPathBytes : null;
 
-			const { replacedCommits } = await this.stackService.uncommitChanges({
+			const { workspace } = await this.stackService.uncommitChanges({
 				projectId: this.projectId,
 				stackId: data.stackId,
 				commitId: data.commitId,
@@ -240,7 +240,7 @@ export class UncommitDzHandler implements DropzoneHandler {
 			});
 
 			// Update the project state to point to the new commit if needed.
-			updateUiState(this.uiState, data.stackId, data.commitId, replacedCommits);
+			updateUiState(this.uiState, data.stackId, data.commitId, workspace.replacedCommits);
 
 			return;
 		}
@@ -290,7 +290,7 @@ export class AmendCommitWithHunkDzHandler implements DropzoneHandler {
 					throw new Error("Can't receive a change without it's source or commit");
 				}
 
-				const { replacedCommits } = await this.stackService.moveChangesBetweenCommits({
+				const { workspace } = await this.stackService.moveChangesBetweenCommits({
 					projectId,
 					destinationStackId: stackId,
 					destinationCommitId: commit.id,
@@ -313,8 +313,8 @@ export class AmendCommitWithHunkDzHandler implements DropzoneHandler {
 				});
 
 				// Update the project state to point to the new commit if needed.
-				updateUiState(this.uiState, data.stackId, data.commitId, replacedCommits);
-				updateUiState(this.uiState, stackId, commit.id, replacedCommits);
+				updateUiState(this.uiState, data.stackId, data.commitId, workspace.replacedCommits);
+				updateUiState(this.uiState, stackId, commit.id, workspace.replacedCommits);
 
 				return;
 			}
@@ -400,12 +400,12 @@ function updateUiState(
 	uiState: UiState,
 	stackId: string,
 	commitId: string,
-	mapping: [string, string][],
+	mapping: Record<string, string>,
 ) {
-	const sourceReplacement = mapping.find(([before]) => before === commitId);
+	const sourceReplacement = mapping[commitId];
 	const sourceState = untrack(() => uiState.lane(stackId).selection.current);
 	if (sourceReplacement && sourceState) {
-		uiState.lane(stackId).selection.set({ ...sourceState, commitId: sourceReplacement[1] });
+		uiState.lane(stackId).selection.set({ ...sourceState, commitId: sourceReplacement });
 	}
 }
 

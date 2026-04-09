@@ -67,14 +67,16 @@ impl<'a> Operation<'a> {
                     *source_commit_id,
                     target,
                     changes,
+                    false,
                 )?;
 
                 Ok(SelectAfterReload::Commit(
                     move_result
+                        .workspace
                         .replaced_commits
                         .get(&target)
                         .with_context(|| {
-                            format!("{target} not found in move_result.replaced_commits")
+                            format!("{target} not found in move_result.workspace.replaced_commits")
                         })
                         .copied()?,
                 ))
@@ -97,6 +99,7 @@ impl<'a> Operation<'a> {
                     *source_commit_id,
                     changes,
                     None,
+                    false,
                 )?;
 
                 Ok(SelectAfterReload::Unassigned)
@@ -119,6 +122,7 @@ impl<'a> Operation<'a> {
                     *source_commit_id,
                     changes,
                     Some(*stack_id),
+                    false,
                 )?;
 
                 Ok(SelectAfterReload::Stack(*stack_id))

@@ -1190,6 +1190,7 @@ impl App {
                             select_after_reload.map(|selection| match selection {
                                 SelectAfterReload::Commit(target_commit_id) => {
                                     let remapped_target_commit_id = discard_result
+                                        .workspace
                                         .replaced_commits
                                         .get(&target_commit_id)
                                         .copied()
@@ -1597,6 +1598,7 @@ impl App {
                 };
 
                 commit_move_result
+                    .workspace
                     .replaced_commits
                     .get(source_commit_id)
                     .copied()

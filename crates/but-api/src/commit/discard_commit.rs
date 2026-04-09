@@ -12,9 +12,10 @@ use crate::commit::types::CommitDiscardResult;
 pub fn commit_discard_only(
     ctx: &mut but_ctx::Context,
     subject_commit_id: gix::ObjectId,
+    dry_run: bool,
 ) -> anyhow::Result<CommitDiscardResult> {
     let mut guard = ctx.exclusive_worktree_access();
-    commit_discard_only_with_perm(ctx, subject_commit_id, guard.write_permission())
+    commit_discard_only_with_perm(ctx, subject_commit_id, dry_run, guard.write_permission())
 }
 
 /// Discard `subject_commit_id` under caller-held exclusive repository access.
@@ -26,19 +27,22 @@ pub fn commit_discard_only(
 pub fn commit_discard_only_with_perm(
     ctx: &mut but_ctx::Context,
     subject_commit_id: gix::ObjectId,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<CommitDiscardResult> {
     let mut meta = ctx.meta()?;
     let (repo, mut ws, _) = ctx.workspace_mut_and_db_with_perm(perm)?;
+    let mut cache = ctx.cache.get_cache_mut()?;
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
 
     let rebase = but_workspace::commit::discard_commit(editor, subject_commit_id)?;
 
-    let materialized = rebase.materialize()?;
+    let workspace =
+        crate::workspace_state::from_successful_rebase(rebase, &repo, &mut cache, dry_run)?;
 
     Ok(CommitDiscardResult {
         discarded_commit: subject_commit_id,
-        replaced_commits: materialized.history.commit_mappings(),
+        workspace,
     })
 }
 
@@ -49,9 +53,10 @@ pub fn commit_discard_only_with_perm(
 pub fn commit_discard(
     ctx: &mut but_ctx::Context,
     subject_commit_id: gix::ObjectId,
+    dry_run: bool,
 ) -> anyhow::Result<CommitDiscardResult> {
     let mut guard = ctx.exclusive_worktree_access();
-    commit_discard_with_perm(ctx, subject_commit_id, guard.write_permission())
+    commit_discard_with_perm(ctx, subject_commit_id, dry_run, guard.write_permission())
 }
 
 /// Discard `subject_commit_id` under caller-held exclusive repository access
@@ -64,6 +69,7 @@ pub fn commit_discard(
 pub fn commit_discard_with_perm(
     ctx: &mut but_ctx::Context,
     subject_commit_id: gix::ObjectId,
+    dry_run: bool,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<CommitDiscardResult> {
     let details = SnapshotDetails::new(OperationKind::DiscardCommit).with_trailers(vec![Trailer {
@@ -77,9 +83,7 @@ pub fn commit_discard_with_perm(
     )
     .ok();
 
-    let res = commit_discard_only_with_perm(ctx, subject_commit_id, perm);
-    if let Some(snapshot) = maybe_oplog_entry.filter(|_| res.is_ok()) {
-        snapshot.commit(ctx, perm).ok();
-    };
+    let res = commit_discard_only_with_perm(ctx, subject_commit_id, dry_run, perm);
+    crate::commit_oplog_snapshot_if_success(dry_run, maybe_oplog_entry, ctx, perm, &res);
     res
 }
