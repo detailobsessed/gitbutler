@@ -9,6 +9,10 @@
 		background-color: var(--color-button-hover-bg);
 	}
 
+	&:not(:disabled):active {
+		background-color: var(--color-button-active-bg);
+	}
+
 	&:disabled {
 		color: var(--color-button-disabled-fg);
 	}

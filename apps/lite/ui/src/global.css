@@ -14,6 +14,7 @@
 	--color-active-operation-target-outline: var(--color-black);
 	--color-bg: var(--color-white);
 	--color-button-bg: var(--color-gray-50);
+	--color-button-active-bg: var(--color-gray-200);
 	--color-button-border: var(--color-gray-200);
 	--color-button-disabled-fg: var(--color-gray-700);
 	--color-button-hover-bg: var(--color-gray-100);
