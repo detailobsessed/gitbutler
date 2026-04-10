@@ -84,10 +84,13 @@ import {
 	ReactNode,
 	Ref,
 	Suspense,
+	useEffect,
+	useEffectEvent,
 	use,
 	useImperativeHandle,
 	useOptimistic,
 	useRef,
+	useState,
 	useTransition,
 } from "react";
 import { Route as projectRoute } from "#ui/routes/project/$id/route.tsx";
@@ -119,6 +122,7 @@ import { WorkspaceCommandMenuItem } from "./WorkspaceCommandMenuItem.tsx";
 import { WorkspaceCommandRuntimeContext } from "#ui/routes/project/$id/workspace/WorkspaceCommandRuntime.tsx";
 import { PositionedShortcutsBar } from "../ShortcutsBar.tsx";
 import { formatShortcutKeys } from "#ui/shortcuts.ts";
+import { WorkspaceCommandPalette } from "./WorkspaceCommandPalette.tsx";
 import styles from "./route.module.css";
 import {
 	fileOperationSource,
@@ -1832,6 +1836,7 @@ const ProjectPage: FC = () => {
 			: getDefaultItem(navigationIndex);
 
 	const shortcutScope = getScope({ selectedItem, layoutState, workspaceMode });
+	const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
 	const {
 		absorptionPlan,
@@ -1853,9 +1858,27 @@ const ProjectPage: FC = () => {
 
 	useMonitorDraggedOperationSource({ projectId });
 
+	const handleCommandPaletteKeyDown = useEffectEvent((event: KeyboardEvent) => {
+		if (event.defaultPrevented) return;
+		if (event.altKey || event.shiftKey) return;
+		if (!(event.metaKey || event.ctrlKey)) return;
+		if (event.key.toLowerCase() !== "k") return;
+
+		event.preventDefault();
+		setIsCommandPaletteOpen((open) => !open);
+	});
+
+	useEffect(() => {
+		window.addEventListener("keydown", handleCommandPaletteKeyDown);
+
+		return () => {
+			window.removeEventListener("keydown", handleCommandPaletteKeyDown);
+		};
+	}, []);
+
 	useWorkspaceShortcuts({
 		runCommand,
-		scope: shortcutScope,
+		scope: isCommandPaletteOpen ? null : shortcutScope,
 	});
 
 	// TODO: dedupe
@@ -1958,6 +1981,11 @@ const ProjectPage: FC = () => {
 				{shortcutScope && (
 					<PositionedShortcutsBar label={shortcutScope.label} items={shortcutScope.bindings} />
 				)}
+
+				<WorkspaceCommandPalette
+					open={isCommandPaletteOpen}
+					onOpenChange={setIsCommandPaletteOpen}
+				/>
 
 				{operationMode && (
 					<div className={styles.operationModePreview}>

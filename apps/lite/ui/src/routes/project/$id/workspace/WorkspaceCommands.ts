@@ -130,7 +130,7 @@ export const getWorkspaceCommandLabel = (command: WorkspaceCommand): string =>
 		}),
 	);
 
-export const workspaceCommandIdentityKey = (command: WorkspaceCommand): string =>
+const workspaceCommandIdentityKey = (command: WorkspaceCommand): string =>
 	Match.value(command).pipe(
 		Match.tagsExhaustive({
 			Absorb: ({ item }) => JSON.stringify(["Absorb", itemIdentityKey(item)]),
@@ -178,7 +178,7 @@ export const workspaceCommandIdentityKey = (command: WorkspaceCommand): string =
 export const workspaceCommandEquals = (a: WorkspaceCommand, b: WorkspaceCommand): boolean =>
 	workspaceCommandIdentityKey(a) === workspaceCommandIdentityKey(b);
 
-export type RunWorkspaceCommandInputs = {
+type RunWorkspaceCommandInputs = {
 	branchRenameFormRef: RefObject<HTMLFormElement | null>;
 	commitMessageFormRef: RefObject<HTMLFormElement | null>;
 	navigationIndex: NavigationIndex;
