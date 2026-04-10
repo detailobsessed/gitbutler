@@ -1,7 +1,6 @@
 import { Dialog } from "@base-ui/react";
 import { FC, ReactNode, use, useState } from "react";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
-import { ShortcutButton } from "#ui/ShortcutButton.tsx";
 import { isPreviewPanelVisible, Panel as PanelType } from "#ui/routes/project/$id/state/layout.ts";
 import {
 	projectActions,
@@ -10,7 +9,8 @@ import {
 import { ShortcutsBarPortalContext } from "#ui/routes/project/$id/ShortcutsBar.tsx";
 import { useAppDispatch, useAppSelector } from "#ui/state/hooks.ts";
 import uiStyles from "#ui/ui.module.css";
-import { closePreviewBinding } from "./workspace/WorkspaceShortcuts.ts";
+import { WorkspaceCommand } from "./workspace/WorkspaceCommands.ts";
+import { WorkspaceCommandButton } from "./workspace/WorkspaceCommandButton.tsx";
 import sharedStyles from "./shared.module.css";
 
 export const ProjectPreviewLayout: FC<{
@@ -20,6 +20,7 @@ export const ProjectPreviewLayout: FC<{
 }> = ({ children, projectId, preview }) => {
 	const dispatch = useAppDispatch();
 	const layoutState = useAppSelector((state) => selectProjectLayoutState(state, projectId));
+
 	const inheritedShortcutsBarPortalNode = use(ShortcutsBarPortalContext);
 	const [dialogShortcutsBarPortalNode, setDialogShortcutsBarPortalNode] =
 		useState<HTMLElement | null>(null);
@@ -82,14 +83,11 @@ export const ProjectPreviewLayout: FC<{
 					<Dialog.Portal>
 						<Dialog.Popup aria-label="Preview" className={sharedStyles.previewDialogPopup}>
 							<div className={sharedStyles.previewDialogBody}>
-								<ShortcutButton
-									binding={closePreviewBinding}
+								<WorkspaceCommandButton
+									command={WorkspaceCommand.ClosePreview()}
 									type="button"
 									className={uiStyles.button}
-									onClick={() => dispatch(projectActions.closePreview({ projectId }))}
-								>
-									{closePreviewBinding.description}
-								</ShortcutButton>
+								/>
 								{preview}
 							</div>
 							<footer ref={setDialogShortcutsBarPortalNode} />

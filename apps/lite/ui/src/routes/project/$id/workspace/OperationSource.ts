@@ -74,7 +74,7 @@ export const segmentOperationSource = ({ branchRef }: SegmentOperationSource): O
 	branchRef,
 });
 
-const operationSourceIdentityKey = (operationSource: OperationSource): string =>
+export const operationSourceIdentityKey = (operationSource: OperationSource): string =>
 	Match.value(operationSource).pipe(
 		Match.tagsExhaustive({
 			BaseCommit: () => JSON.stringify(["BaseCommit"]),

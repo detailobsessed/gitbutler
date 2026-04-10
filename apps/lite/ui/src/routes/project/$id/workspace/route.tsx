@@ -1,10 +1,4 @@
-import {
-	commitDiscardMutationOptions,
-	commitInsertBlankMutationOptions,
-	commitRewordMutationOptions,
-	updateBranchNameMutationOptions,
-	unapplyStackMutationOptions,
-} from "#ui/api/mutations.ts";
+import { commitRewordMutationOptions, updateBranchNameMutationOptions } from "#ui/api/mutations.ts";
 import {
 	branchDetailsQueryOptions,
 	branchDiffQueryOptions,
@@ -28,7 +22,8 @@ import {
 } from "#ui/domain/FileParent.ts";
 import { getBranchNameByCommitId, getCommonBaseCommitId } from "#ui/domain/RefInfo.ts";
 import { ProjectPreviewLayout } from "#ui/routes/project/$id/ProjectPreviewLayout.tsx";
-import { getFocus } from "#ui/routes/project/$id/state/layout.ts";
+import { getFocus, isPreviewPanelVisible } from "#ui/routes/project/$id/state/layout.ts";
+import { PositionedTopBarActions } from "#ui/routes/project/$id/TopBarActions.tsx";
 import {
 	projectActions,
 	selectProjectExpandedCommitId,
@@ -68,7 +63,6 @@ import {
 import uiStyles from "#ui/ui.module.css";
 import { ContextMenu, Menu, mergeProps, Tooltip, useRender } from "@base-ui/react";
 import {
-	AbsorptionTarget,
 	Commit,
 	DiffHunk,
 	HunkAssignment,
@@ -90,6 +84,7 @@ import {
 	ReactNode,
 	Ref,
 	Suspense,
+	use,
 	useImperativeHandle,
 	useOptimistic,
 	useRef,
@@ -118,28 +113,26 @@ import {
 	type NavigationIndex,
 	useWorkspaceOutline,
 } from "./WorkspaceModel.ts";
-import {
-	getScopeBindings,
-	getScopeLabel,
-	getScope,
-	renameBranchBindings,
-	rewordCommitBindings,
-	useWorkspaceShortcuts,
-} from "./WorkspaceShortcuts.ts";
+import { getScope, useWorkspaceShortcuts } from "./WorkspaceShortcuts.ts";
+import { WorkspaceCommandButton } from "./WorkspaceCommandButton.tsx";
+import { WorkspaceCommandMenuItem } from "./WorkspaceCommandMenuItem.tsx";
+import { WorkspaceCommandRuntimeContext } from "#ui/routes/project/$id/workspace/WorkspaceCommandRuntime.tsx";
 import { PositionedShortcutsBar } from "../ShortcutsBar.tsx";
-import { formatShortcutKeys, ShortcutActionBase, type ShortcutBinding } from "#ui/shortcuts.ts";
+import { formatShortcutKeys } from "#ui/shortcuts.ts";
 import styles from "./route.module.css";
 import {
 	fileOperationSource,
 	hunkOperationSource,
 	operationSourceFromItem,
 } from "./OperationSource.ts";
+import { useRunWorkspaceCommand, WorkspaceCommand } from "./WorkspaceCommands.ts";
 import {
 	getOperationMode,
 	normalizeWorkspaceMode,
 	type OperationMode,
 	type WorkspaceMode,
 } from "./WorkspaceMode.ts";
+import { assert } from "#ui/routes/project/$id/shared.tsx";
 
 type HunkDependencyDiff = HunkDependencies["diffs"][number];
 const fileHunkKey = (path: string, hunk: HunkHeader): string => `${path}:${hunkKey(hunk)}`;
@@ -402,7 +395,7 @@ const hunkKeysFromChangeWithDiff = (
 			)
 		: [];
 
-export type PreviewImperativeHandle = {
+type PreviewImperativeHandle = {
 	moveSelection: (offset: -1 | 1) => void;
 };
 
@@ -723,46 +716,41 @@ const Preview: FC<{
 	);
 
 const StackMenuPopup: FC<{
-	projectId: string;
 	stackId: string;
-}> = ({ projectId, stackId }) => {
-	const unapplyStack = useMutation(unapplyStackMutationOptions);
+}> = ({ stackId }) => (
+	<Menu.Popup className={classes(uiStyles.popup, uiStyles.menuPopup)}>
+		<Menu.Item className={uiStyles.menuItem} disabled>
+			Move to leftmost
+		</Menu.Item>
+		<Menu.Item className={uiStyles.menuItem} disabled>
+			Move to rightmost
+		</Menu.Item>
+		<Menu.Separator />
+		<Menu.Item
+			className={uiStyles.menuItem}
+			render={<WorkspaceCommandMenuItem command={WorkspaceCommand.UnapplyStack({ stackId })} />}
+		/>
+	</Menu.Popup>
+);
+
+const EditorHelp: FC = () => {
+	const { scope } = assert(use(WorkspaceCommandRuntimeContext));
+	const bindings = scope ? scope.bindings : [];
+
+	if (bindings.length === 0) return null;
 
 	return (
-		<Menu.Popup className={classes(uiStyles.popup, uiStyles.menuPopup)}>
-			<Menu.Item className={uiStyles.menuItem} disabled>
-				Move to leftmost
-			</Menu.Item>
-			<Menu.Item className={uiStyles.menuItem} disabled>
-				Move to rightmost
-			</Menu.Item>
-			<Menu.Separator />
-			<Menu.Item
-				className={uiStyles.menuItem}
-				disabled={unapplyStack.isPending}
-				onClick={() => {
-					unapplyStack.mutate({ projectId, stackId });
-				}}
-			>
-				Unapply stack
-			</Menu.Item>
-		</Menu.Popup>
+		<div className={styles.editorHelp}>
+			{bindings.map((binding, index) => (
+				<Fragment key={binding.id}>
+					{index > 0 && " • "}
+					<span className={styles.editorShortcut}>{formatShortcutKeys(binding.keys)}</span> to{" "}
+					{binding.description}
+				</Fragment>
+			))}
+		</div>
 	);
 };
-
-const EditorHelp: FC<{
-	bindings: Array<ShortcutBinding<ShortcutActionBase>>;
-}> = ({ bindings }) => (
-	<div className={styles.editorHelp}>
-		{bindings.map((binding, index) => (
-			<Fragment key={binding.id}>
-				{index > 0 && " • "}
-				<span className={styles.editorShortcut}>{formatShortcutKeys(binding.keys)}</span> to{" "}
-				{binding.description}
-			</Fragment>
-		))}
-	</div>
-);
 
 const InlineCommitMessageEditor: FC<{
 	message: string;
@@ -792,69 +780,51 @@ const InlineCommitMessageEditor: FC<{
 			defaultValue={message.trim()}
 			className={classes(styles.editorInput, styles.editCommitMessageInput)}
 		/>
-		<EditorHelp bindings={rewordCommitBindings} />
+		<EditorHelp />
 	</form>
 );
 
 const CommitMenuPopup: FC<{
-	projectId: string;
-	commitId: string;
+	item: CommitItem;
 	canReword: boolean;
-	onReword: () => void;
 	parts: typeof Menu | typeof ContextMenu;
-}> = ({ projectId, commitId, canReword, onReword, parts }) => {
-	const commitInsertBlank = useMutation(commitInsertBlankMutationOptions);
-	const commitDiscard = useMutation(commitDiscardMutationOptions);
-	const { Popup, Item, SubmenuRoot, SubmenuTrigger, Positioner } = parts;
+}> = ({ item, canReword, parts }) => {
+	const { Item, Popup, SubmenuRoot, SubmenuTrigger, Positioner } = parts;
 
 	return (
 		<Popup className={classes(uiStyles.popup, uiStyles.menuPopup)}>
-			<Item className={uiStyles.menuItem} disabled={!canReword} onClick={onReword}>
-				Reword commit
-			</Item>
+			<Item
+				className={uiStyles.menuItem}
+				disabled={!canReword}
+				render={<WorkspaceCommandMenuItem command={WorkspaceCommand.StartRewordCommit({ item })} />}
+			/>
 			<SubmenuRoot>
 				<SubmenuTrigger className={uiStyles.menuItem}>Add empty commit</SubmenuTrigger>
 				<Positioner>
 					<Popup className={classes(uiStyles.popup, uiStyles.menuPopup)}>
 						<Item
 							className={uiStyles.menuItem}
-							onClick={() => {
-								commitInsertBlank.mutate({
-									projectId,
-									relativeTo: { type: "commit", subject: commitId },
-									side: "above",
-								});
-							}}
-						>
-							Above
-						</Item>
+							render={
+								<WorkspaceCommandMenuItem
+									command={WorkspaceCommand.InsertBlankCommitAbove({ item })}
+								/>
+							}
+						/>
 						<Item
 							className={uiStyles.menuItem}
-							onClick={() => {
-								commitInsertBlank.mutate({
-									projectId,
-									relativeTo: { type: "commit", subject: commitId },
-									side: "below",
-								});
-							}}
-						>
-							Below
-						</Item>
+							render={
+								<WorkspaceCommandMenuItem
+									command={WorkspaceCommand.InsertBlankCommitBelow({ item })}
+								/>
+							}
+						/>
 					</Popup>
 				</Positioner>
 			</SubmenuRoot>
 			<Item
 				className={uiStyles.menuItem}
-				disabled={commitDiscard.isPending}
-				onClick={() => {
-					commitDiscard.mutate({
-						projectId,
-						subjectCommitId: commitId,
-					});
-				}}
-			>
-				Delete commit
-			</Item>
+				render={<WorkspaceCommandMenuItem command={WorkspaceCommand.DeleteCommit({ item })} />}
+			/>
 		</Popup>
 	);
 };
@@ -887,7 +857,7 @@ const CommitRow: FC<
 	navigationIndex,
 	...restProps
 }) => {
-	const dispatch = useAppDispatch();
+	const { runCommand } = assert(use(WorkspaceCommandRuntimeContext));
 	const commitItemV: CommitItem = {
 		stackId,
 		segmentIndex,
@@ -912,13 +882,9 @@ const CommitRow: FC<
 
 	const commitReword = useMutation(commitRewordMutationOptions);
 
-	const startEditing = () => {
-		dispatch(projectActions.startRewordCommit({ projectId, item: commitItemV }));
-	};
-
 	const endEditing = () => {
-		dispatch(projectActions.exitMode({ projectId }));
-		dispatch(projectActions.selectItem({ projectId, item }));
+		runCommand(WorkspaceCommand.CancelMode());
+		runCommand(WorkspaceCommand.SelectItem({ item }));
 	};
 
 	const saveNewMessage = (newMessage: string) => {
@@ -966,9 +932,7 @@ const CommitRow: FC<
 										sharedStyles.commitButton,
 										isCommitMessagePending && sharedStyles.commitButtonPending,
 									)}
-									onClick={() => {
-										dispatch(projectActions.selectItem({ projectId, item }));
-									}}
+									onClick={() => runCommand(WorkspaceCommand.SelectItem({ item }))}
 								>
 									<CommitLabel commit={commitWithOptimisticMessage} />
 								</button>
@@ -977,10 +941,8 @@ const CommitRow: FC<
 						<ContextMenu.Portal>
 							<ContextMenu.Positioner>
 								<CommitMenuPopup
-									projectId={projectId}
-									commitId={commit.id}
+									item={commitItemV}
 									canReword={!isCommitMessagePending}
-									onReword={startEditing}
 									parts={ContextMenu}
 								/>
 							</ContextMenu.Positioner>
@@ -988,30 +950,14 @@ const CommitRow: FC<
 					</ContextMenu.Root>
 					{workspaceMode._tag === "Default" && (
 						<>
-							<Tooltip.Root
-								// Prevent tooltip from lingering while moving between nearby controls.
-								// [tag:tooltip-disable-hoverable-popup]
-								disableHoverablePopup
+							<WorkspaceCommandButton
+								command={WorkspaceCommand.ToggleCommitFiles({ item: commitItemV })}
+								className={sharedStyles.itemRowAction}
+								type="button"
+								aria-expanded={isExpanded}
 							>
-								<Tooltip.Trigger
-									className={sharedStyles.itemRowAction}
-									type="button"
-									onClick={() =>
-										dispatch(projectActions.toggleCommitFiles({ projectId, item: commitItemV }))
-									}
-									aria-expanded={isExpanded}
-									aria-label={isExpanded ? "Hide commit files" : "Show commit files"}
-								>
-									<ExpandCollapseIcon isExpanded={isExpanded} />
-								</Tooltip.Trigger>
-								<Tooltip.Portal>
-									<Tooltip.Positioner sideOffset={8}>
-										<Tooltip.Popup className={classes(uiStyles.popup, uiStyles.tooltip)}>
-											{isExpanded ? "Hide commit files" : "Show commit files"}
-										</Tooltip.Popup>
-									</Tooltip.Positioner>
-								</Tooltip.Portal>
-							</Tooltip.Root>
+								<ExpandCollapseIcon isExpanded={isExpanded} />
+							</WorkspaceCommandButton>
 							<Menu.Root>
 								<Menu.Trigger className={sharedStyles.itemRowAction} aria-label="Commit menu">
 									<MenuTriggerIcon />
@@ -1019,10 +965,8 @@ const CommitRow: FC<
 								<Menu.Portal>
 									<Menu.Positioner align="end">
 										<CommitMenuPopup
-											projectId={projectId}
-											commitId={commit.id}
+											item={commitItemV}
 											canReword={!isCommitMessagePending}
-											onReword={startEditing}
 											parts={Menu}
 										/>
 									</Menu.Positioner>
@@ -1155,28 +1099,17 @@ const CommitC: FC<{
 };
 
 const ChangeRowMenuPopup: FC<{
-	change: TreeChange;
-	onAbsorbChanges: (target: AbsorptionTarget) => void;
+	item: Item;
 	parts: typeof Menu | typeof ContextMenu;
-	stackId: string | null;
-}> = ({ change, onAbsorbChanges, parts, stackId }) => {
-	const { Popup, Item } = parts;
-
-	const absorb = () => {
-		onAbsorbChanges({
-			type: "treeChanges",
-			subject: {
-				changes: [change],
-				assigned_stack_id: stackId,
-			},
-		});
-	};
+}> = ({ item, parts }) => {
+	const { Item, Popup } = parts;
 
 	return (
 		<Popup className={classes(uiStyles.popup, uiStyles.menuPopup)}>
-			<Item className={uiStyles.menuItem} onClick={absorb}>
-				Absorb
-			</Item>
+			<Item
+				className={uiStyles.menuItem}
+				render={<WorkspaceCommandMenuItem command={WorkspaceCommand.Absorb({ item })} />}
+			/>
 		</Popup>
 	);
 };
@@ -1186,7 +1119,6 @@ const ChangeRow: FC<{
 	dependencyCommitIds: Array<string>;
 	isSelected: boolean;
 	navigationIndex: NavigationIndex;
-	onAbsorbChanges: (target: AbsorptionTarget) => void;
 	operationMode: OperationMode | null;
 	projectId: string;
 	stackId: string | null;
@@ -1195,7 +1127,6 @@ const ChangeRow: FC<{
 	dependencyCommitIds,
 	isSelected,
 	navigationIndex,
-	onAbsorbChanges,
 	operationMode,
 	projectId,
 	stackId,
@@ -1224,12 +1155,7 @@ const ChangeRow: FC<{
 				/>
 				<ContextMenu.Portal>
 					<ContextMenu.Positioner>
-						<ChangeRowMenuPopup
-							change={change}
-							onAbsorbChanges={onAbsorbChanges}
-							parts={ContextMenu}
-							stackId={stackId}
-						/>
+						<ChangeRowMenuPopup item={item} parts={ContextMenu} />
 					</ContextMenu.Positioner>
 				</ContextMenu.Portal>
 			</ContextMenu.Root>
@@ -1248,12 +1174,7 @@ const ChangeRow: FC<{
 				</Menu.Trigger>
 				<Menu.Portal>
 					<Menu.Positioner align="end">
-						<ChangeRowMenuPopup
-							change={change}
-							onAbsorbChanges={onAbsorbChanges}
-							parts={Menu}
-							stackId={stackId}
-						/>
+						<ChangeRowMenuPopup item={item} parts={Menu} />
 					</Menu.Positioner>
 				</Menu.Portal>
 			</Menu.Root>
@@ -1262,28 +1183,19 @@ const ChangeRow: FC<{
 };
 
 const ChangesSectionRowMenuPopup: FC<{
-	changes: Array<TreeChange>;
-	onAbsorbChanges: (target: AbsorptionTarget) => void;
+	canAbsorb: boolean;
+	item: Item;
 	parts: typeof Menu | typeof ContextMenu;
-	stackId: string | null;
-}> = ({ changes, onAbsorbChanges, parts, stackId }) => {
-	const { Popup, Item } = parts;
-
-	const absorb = () => {
-		onAbsorbChanges({
-			type: "treeChanges",
-			subject: {
-				changes,
-				assigned_stack_id: stackId,
-			},
-		});
-	};
+}> = ({ canAbsorb, item, parts }) => {
+	const { Item, Popup } = parts;
 
 	return (
 		<Popup className={classes(uiStyles.popup, uiStyles.menuPopup)}>
-			<Item className={uiStyles.menuItem} disabled={changes.length === 0} onClick={absorb}>
-				Absorb
-			</Item>
+			<Item
+				className={uiStyles.menuItem}
+				disabled={!canAbsorb}
+				render={<WorkspaceCommandMenuItem command={WorkspaceCommand.Absorb({ item })} />}
+			/>
 		</Popup>
 	);
 };
@@ -1293,17 +1205,14 @@ const ChangesSectionRow: FC<{
 	isSelected: boolean;
 	navigationIndex: NavigationIndex;
 	label: string;
-	onAbsorbChanges: (target: AbsorptionTarget) => void;
 	projectId: string;
 	stackId: string | null;
-}> = ({ changes, isSelected, navigationIndex, label, onAbsorbChanges, projectId, stackId }) => {
+}> = ({ changes, isSelected, navigationIndex, label, projectId, stackId }) => {
 	const dispatch = useAppDispatch();
+	const item = changesSectionItem({ stackId });
 
 	return (
-		<ItemRow
-			inert={!navigationIndexIncludes(navigationIndex, changesSectionItem({ stackId }))}
-			isSelected={isSelected}
-		>
+		<ItemRow inert={!navigationIndexIncludes(navigationIndex, item)} isSelected={isSelected}>
 			<ContextMenu.Root>
 				<ContextMenu.Trigger
 					render={
@@ -1314,7 +1223,7 @@ const ChangesSectionRow: FC<{
 								dispatch(
 									projectActions.selectItem({
 										projectId,
-										item: changesSectionItem({ stackId }),
+										item,
 									}),
 								);
 							}}
@@ -1326,10 +1235,9 @@ const ChangesSectionRow: FC<{
 				<ContextMenu.Portal>
 					<ContextMenu.Positioner>
 						<ChangesSectionRowMenuPopup
-							changes={changes}
-							onAbsorbChanges={onAbsorbChanges}
+							canAbsorb={changes.length !== 0}
+							item={item}
 							parts={ContextMenu}
-							stackId={stackId}
 						/>
 					</ContextMenu.Positioner>
 				</ContextMenu.Portal>
@@ -1340,12 +1248,7 @@ const ChangesSectionRow: FC<{
 				</Menu.Trigger>
 				<Menu.Portal>
 					<Menu.Positioner align="end">
-						<ChangesSectionRowMenuPopup
-							changes={changes}
-							onAbsorbChanges={onAbsorbChanges}
-							parts={Menu}
-							stackId={stackId}
-						/>
+						<ChangesSectionRowMenuPopup canAbsorb={changes.length !== 0} item={item} parts={Menu} />
 					</Menu.Positioner>
 				</Menu.Portal>
 			</Menu.Root>
@@ -1391,7 +1294,6 @@ const Changes: FC<{
 	stackId: string | null;
 	isSelected: boolean;
 	selectedPath: string | null;
-	onAbsorbChanges: (target: AbsorptionTarget) => void;
 	className?: string;
 	navigationIndex: NavigationIndex;
 }> = ({
@@ -1401,7 +1303,6 @@ const Changes: FC<{
 	stackId,
 	isSelected,
 	selectedPath,
-	onAbsorbChanges,
 	className,
 	navigationIndex,
 }) => {
@@ -1417,12 +1318,11 @@ const Changes: FC<{
 
 	const item = changesSectionItem({ stackId });
 
-	const dispatch = useAppDispatch();
+	const { runCommand } = assert(use(WorkspaceCommandRuntimeContext));
 
 	const commit = () =>
-		dispatch(
-			projectActions.enterMoveMode({
-				projectId,
+		runCommand(
+			WorkspaceCommand.EnterMoveMode({
 				source: operationSourceFromItem(changesSectionItem({ stackId })),
 			}),
 		);
@@ -1452,7 +1352,6 @@ const Changes: FC<{
 					isSelected={isSelected}
 					navigationIndex={navigationIndex}
 					label={label}
-					onAbsorbChanges={onAbsorbChanges}
 					projectId={projectId}
 					stackId={stackId}
 				/>
@@ -1473,7 +1372,6 @@ const Changes: FC<{
 										dependencyCommitIds={dependencyCommitIds}
 										isSelected={selectedPath === change.path}
 										navigationIndex={navigationIndex}
-										onAbsorbChanges={onAbsorbChanges}
 										operationMode={operationMode}
 										projectId={projectId}
 										stackId={stackId}
@@ -1492,17 +1390,19 @@ const Changes: FC<{
 };
 
 const SegmentMenuPopup: FC<{
+	item: SegmentItem;
 	canRename: boolean;
-	onRename: () => void;
 	parts: typeof Menu | typeof ContextMenu;
-}> = ({ canRename, onRename, parts }) => {
-	const { Popup, Item } = parts;
+}> = ({ item, canRename, parts }) => {
+	const { Item, Popup } = parts;
 
 	return (
 		<Popup className={classes(uiStyles.popup, uiStyles.menuPopup)}>
-			<Item className={uiStyles.menuItem} disabled={!canRename} onClick={onRename}>
-				Rename branch
-			</Item>
+			<Item
+				className={uiStyles.menuItem}
+				disabled={!canRename}
+				render={<WorkspaceCommandMenuItem command={WorkspaceCommand.StartRenameBranch({ item })} />}
+			/>
 		</Popup>
 	);
 };
@@ -1534,7 +1434,7 @@ const InlineBranchNameEditor: FC<{
 			defaultValue={branchName}
 			className={classes(styles.editorInput, styles.renameBranchInput)}
 		/>
-		<EditorHelp bindings={renameBranchBindings} />
+		<EditorHelp />
 	</form>
 );
 
@@ -1562,7 +1462,7 @@ const SegmentRow: FC<
 	navigationIndex,
 	...restProps
 }) => {
-	const dispatch = useAppDispatch();
+	const { runCommand } = assert(use(WorkspaceCommandRuntimeContext));
 	const branchName = segment.refName?.displayName ?? null;
 	const branchRef = segment.refName?.fullNameBytes ?? null;
 	const segmentItemV: SegmentItem = {
@@ -1584,14 +1484,9 @@ const SegmentRow: FC<
 
 	const updateBranchName = useMutation(updateBranchNameMutationOptions);
 
-	const startEditing = () => {
-		if (branchName === null) return;
-		dispatch(projectActions.startRenameBranch({ projectId, item: segmentItemV }));
-	};
-
 	const endEditing = () => {
-		dispatch(projectActions.exitMode({ projectId }));
-		dispatch(projectActions.selectItem({ projectId, item }));
+		runCommand(WorkspaceCommand.CancelMode());
+		runCommand(WorkspaceCommand.SelectItem({ item }));
 	};
 
 	const saveBranchName = (newBranchName: string) => {
@@ -1612,9 +1507,8 @@ const SegmentRow: FC<
 				// error boundaries.
 				return;
 			}
-			dispatch(
-				projectActions.selectItem({
-					projectId,
+			runCommand(
+				WorkspaceCommand.SelectItem({
 					item: segmentItem({
 						stackId,
 						segmentIndex,
@@ -1623,7 +1517,7 @@ const SegmentRow: FC<
 					}),
 				}),
 			);
-			dispatch(projectActions.exitMode({ projectId }));
+			runCommand(WorkspaceCommand.CancelMode());
 		});
 	};
 
@@ -1659,7 +1553,7 @@ const SegmentRow: FC<
 												<button
 													type="button"
 													className={styles.segmentButton}
-													onClick={() => dispatch(projectActions.selectItem({ projectId, item }))}
+													onClick={() => runCommand(WorkspaceCommand.SelectItem({ item }))}
 												>
 													{optimisticBranchName ?? "Untitled"}
 												</button>
@@ -1668,8 +1562,8 @@ const SegmentRow: FC<
 										<ContextMenu.Portal>
 											<ContextMenu.Positioner>
 												<SegmentMenuPopup
+													item={segmentItemV}
 													canRename={branchName !== null && !isRenamePending}
-													onRename={startEditing}
 													parts={ContextMenu}
 												/>
 											</ContextMenu.Positioner>
@@ -1695,8 +1589,8 @@ const SegmentRow: FC<
 												<Menu.Portal>
 													<Menu.Positioner align="end">
 														<SegmentMenuPopup
+															item={segmentItemV}
 															canRename={branchName !== null && !isRenamePending}
-															onRename={startEditing}
 															parts={Menu}
 														/>
 													</Menu.Positioner>
@@ -1806,7 +1700,6 @@ const StackC: FC<{
 	branchRenameFormRef: Ref<HTMLFormElement>;
 	commitMessageFormRef: Ref<HTMLFormElement>;
 	operationMode: OperationMode | null;
-	onAbsorbChanges: (target: AbsorptionTarget) => void;
 	projectId: string;
 	selectedItem: Item | null;
 	stack: Stack;
@@ -1816,7 +1709,6 @@ const StackC: FC<{
 	branchRenameFormRef,
 	commitMessageFormRef,
 	operationMode,
-	onAbsorbChanges,
 	projectId,
 	selectedItem,
 	stack,
@@ -1843,7 +1735,7 @@ const StackC: FC<{
 						</Menu.Trigger>
 						<Menu.Portal>
 							<Menu.Positioner align="end">
-								<StackMenuPopup projectId={projectId} stackId={stackId} />
+								<StackMenuPopup stackId={stackId} />
 							</Menu.Positioner>
 						</Menu.Portal>
 					</Menu.Root>
@@ -1859,7 +1751,6 @@ const StackC: FC<{
 							? selectedItem.path
 							: null
 					}
-					onAbsorbChanges={onAbsorbChanges}
 					navigationIndex={navigationIndex}
 				/>
 			</div>
@@ -1950,124 +1841,142 @@ const ProjectPage: FC = () => {
 		clearAbsorptionPlan,
 	} = useAbsorption(projectId);
 
+	const runCommand = useRunWorkspaceCommand({
+		branchRenameFormRef,
+		commitMessageFormRef,
+		navigationIndex,
+		operationMode,
+		previewRef,
+		projectId,
+		requestAbsorptionPlan,
+	});
+
 	useMonitorDraggedOperationSource({ projectId });
 
 	useWorkspaceShortcuts({
-		branchRenameFormRef,
-		commitMessageFormRef,
-		projectId,
+		runCommand,
 		scope: shortcutScope,
-		navigationIndex,
-		requestAbsorptionPlan,
-		operationMode,
-		previewRef,
 	});
 
 	// TODO: dedupe
 	if (!project) return <p>Project not found.</p>;
 
 	return (
-		<ProjectPreviewLayout
-			projectId={projectId}
-			preview={
-				selectedItem && (
-					<Suspense fallback={<div>Loading preview…</div>}>
-						<Preview
+		<WorkspaceCommandRuntimeContext value={{ runCommand, scope: shortcutScope }}>
+			<ProjectPreviewLayout
+				projectId={projectId}
+				preview={
+					selectedItem && (
+						<Suspense fallback={<div>Loading preview…</div>}>
+							<Preview
+								operationMode={operationMode}
+								projectId={projectId}
+								selectedItem={selectedItem}
+								isFocused={getFocus(layoutState) === "preview"}
+								ref={previewRef}
+							/>
+						</Suspense>
+					)
+				}
+			>
+				<div className={sharedStyles.lanes}>
+					<div className={styles.unassignedChangesLane}>
+						<div className={styles.laneActions}>
+							<Menu.Root>
+								<Menu.Trigger className={styles.stackMenuTrigger} aria-label="Menu" disabled>
+									<MenuTriggerIcon />
+								</Menu.Trigger>
+							</Menu.Root>
+						</div>
+
+						<Changes
+							label="Unassigned changes"
 							operationMode={operationMode}
 							projectId={projectId}
-							selectedItem={selectedItem}
-							isFocused={getFocus(layoutState) === "preview"}
-							ref={previewRef}
-						/>
-					</Suspense>
-				)
-			}
-		>
-			<div className={sharedStyles.lanes}>
-				<div className={styles.unassignedChangesLane}>
-					<div className={styles.laneActions}>
-						<Menu.Root>
-							<Menu.Trigger className={styles.stackMenuTrigger} aria-label="Menu" disabled>
-								<MenuTriggerIcon />
-							</Menu.Trigger>
-						</Menu.Root>
-					</div>
-
-					<Changes
-						label="Unassigned changes"
-						operationMode={operationMode}
-						projectId={projectId}
-						stackId={null}
-						isSelected={selectedItem?._tag === "ChangesSection" && selectedItem.stackId === null}
-						selectedPath={
-							selectedItem?._tag === "Change" && selectedItem.stackId === null
-								? selectedItem.path
-								: null
-						}
-						onAbsorbChanges={requestAbsorptionPlan}
-						navigationIndex={navigationIndex}
-					/>
-				</div>
-
-				<div className={styles.headInfo}>
-					<div className={styles.stackLanes}>
-						{headInfo.stacks.map((stack) => (
-							<div key={stack.id} className={styles.stackLane}>
-								<StackC
-									branchRenameFormRef={branchRenameFormRef}
-									commitMessageFormRef={commitMessageFormRef}
-									operationMode={operationMode}
-									onAbsorbChanges={requestAbsorptionPlan}
-									projectId={project.id}
-									selectedItem={selectedItem}
-									stack={stack}
-									workspaceMode={workspaceMode}
-									navigationIndex={navigationIndex}
-								/>
-							</div>
-						))}
-					</div>
-
-					<div className={styles.commonBaseCommitContainer}>
-						<OperationTarget
-							projectId={projectId}
-							item={baseCommitItem}
-							operationMode={operationMode}
-							selectedItem={selectedItem?._tag === "BaseCommit" ? selectedItem : null}
-							render={
-								<BaseCommitRow
-									commitId={commonBaseCommitId}
-									isSelected={selectedItem?._tag === "BaseCommit"}
-									navigationIndex={navigationIndex}
-								/>
+							stackId={null}
+							isSelected={selectedItem?._tag === "ChangesSection" && selectedItem.stackId === null}
+							selectedPath={
+								selectedItem?._tag === "Change" && selectedItem.stackId === null
+									? selectedItem.path
+									: null
 							}
+							navigationIndex={navigationIndex}
 						/>
 					</div>
+
+					<div className={styles.headInfo}>
+						<div className={styles.stackLanes}>
+							{headInfo.stacks.map((stack) => (
+								<div key={stack.id} className={styles.stackLane}>
+									<StackC
+										branchRenameFormRef={branchRenameFormRef}
+										commitMessageFormRef={commitMessageFormRef}
+										operationMode={operationMode}
+										projectId={project.id}
+										selectedItem={selectedItem}
+										stack={stack}
+										workspaceMode={workspaceMode}
+										navigationIndex={navigationIndex}
+									/>
+								</div>
+							))}
+						</div>
+
+						<div className={styles.commonBaseCommitContainer}>
+							<OperationTarget
+								projectId={projectId}
+								item={baseCommitItem}
+								operationMode={operationMode}
+								selectedItem={selectedItem?._tag === "BaseCommit" ? selectedItem : null}
+								render={
+									<BaseCommitRow
+										commitId={commonBaseCommitId}
+										isSelected={selectedItem?._tag === "BaseCommit"}
+										navigationIndex={navigationIndex}
+									/>
+								}
+							/>
+						</div>
+					</div>
 				</div>
-			</div>
 
-			<PositionedShortcutsBar
-				label={shortcutScope ? getScopeLabel(shortcutScope) : null}
-				items={shortcutScope ? getScopeBindings(shortcutScope) : []}
-			/>
+				<PositionedTopBarActions>
+					<WorkspaceCommandButton
+						command={WorkspaceCommand.TogglePreview()}
+						type="button"
+						className={uiStyles.button}
+						aria-pressed={isPreviewPanelVisible(layoutState)}
+					/>
+					<WorkspaceCommandButton
+						command={WorkspaceCommand.ToggleFullscreenPreview()}
+						type="button"
+						className={uiStyles.button}
+						aria-pressed={layoutState.isFullscreenPreviewOpen}
+					/>
+				</PositionedTopBarActions>
 
-			{operationMode && (
-				<div className={styles.operationModePreview}>
-					<OperationSourceLabel headInfo={headInfo} source={operationMode.source} />
-				</div>
-			)}
+				{shortcutScope && (
+					<PositionedShortcutsBar label={shortcutScope.label} items={shortcutScope.bindings} />
+				)}
 
-			{absorptionPlan !== null && (
-				<AbsorptionDialog
-					absorptionPlan={absorptionPlan}
-					isPending={isAbsorbing}
-					onConfirm={confirmAbsorption}
-					onOpenChange={(open) => {
-						if (!open) clearAbsorptionPlan();
-					}}
-				/>
-			)}
-		</ProjectPreviewLayout>
+				{operationMode && (
+					<div className={styles.operationModePreview}>
+						<OperationSourceLabel headInfo={headInfo} source={operationMode.source} />
+					</div>
+				)}
+
+				{absorptionPlan !== null && (
+					<AbsorptionDialog
+						absorptionPlan={absorptionPlan}
+						isPending={isAbsorbing}
+						onConfirm={confirmAbsorption}
+						onOpenChange={(open) => {
+							if (!open) clearAbsorptionPlan();
+						}}
+					/>
+				)}
+			</ProjectPreviewLayout>
+		</WorkspaceCommandRuntimeContext>
 	);
 };
 

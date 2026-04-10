@@ -1,19 +1,28 @@
 import { classes } from "#ui/classes.ts";
 import { mergeProps, Tooltip, useRender } from "@base-ui/react";
-import { FC } from "react";
-import { bindingButtonLabel, ShortcutActionBase, ShortcutBinding } from "#ui/shortcuts.ts";
+import type { FC } from "react";
+import { formatShortcutKeys } from "#ui/shortcuts.ts";
 import uiStyles from "#ui/ui.module.css";
 
-type ShortcutButtonProps = {
-	binding: ShortcutBinding<ShortcutActionBase>;
+type CommandButtonProps = {
+	label: string;
+	shortcutKeys?: Array<string> | null;
 } & useRender.ComponentProps<"button">;
 
-export const ShortcutButton: FC<ShortcutButtonProps> = ({ binding, render, ...props }) => {
-	const tooltip = bindingButtonLabel(binding);
+export const CommandButton: FC<CommandButtonProps> = ({
+	label,
+	render,
+	shortcutKeys = null,
+	...props
+}) => {
+	const ariaLabel =
+		shortcutKeys && shortcutKeys.length > 0
+			? `${label} (${formatShortcutKeys(shortcutKeys)})`
+			: label;
 	const trigger = useRender({
 		render,
 		defaultTagName: "button",
-		props: mergeProps<"button">({ "aria-label": tooltip }, props),
+		props: mergeProps<"button">({ "aria-label": ariaLabel }, props),
 	});
 
 	return (
@@ -27,7 +36,10 @@ export const ShortcutButton: FC<ShortcutButtonProps> = ({ binding, render, ...pr
 			<Tooltip.Portal>
 				<Tooltip.Positioner sideOffset={8}>
 					<Tooltip.Popup className={classes(uiStyles.popup, uiStyles.tooltip)}>
-						{tooltip}
+						<span>{label}</span>
+						{shortcutKeys && (
+							<span className={uiStyles.shortcutKeys}> ({formatShortcutKeys(shortcutKeys)})</span>
+						)}
 					</Tooltip.Popup>
 				</Tooltip.Positioner>
 			</Tooltip.Portal>

@@ -6,11 +6,8 @@ import { FC } from "react";
 import styles from "./route.module.css";
 import { OperationSource, operationSourceMatchesItem } from "./OperationSource";
 import { Item } from "./Item";
-
-type OperationTooltipControls = {
-	onConfirm: () => void;
-	onCancel: () => void;
-};
+import { WorkspaceCommandButton } from "./WorkspaceCommandButton.tsx";
+import { WorkspaceCommand } from "./WorkspaceCommands.ts";
 
 export const OperationTooltip: FC<
 	{
@@ -18,7 +15,7 @@ export const OperationTooltip: FC<
 		operation: Operation | null;
 		sourceOperation?: OperationSource;
 		sourceItem: Item;
-		controls: OperationTooltipControls | undefined;
+		controls: boolean;
 	} & useRender.ComponentProps<"div">
 > = ({
 	enabled,
@@ -37,17 +34,17 @@ export const OperationTooltip: FC<
 		) : operation ? (
 			controls ? (
 				<>
-					<button type="button" className={uiStyles.button} onClick={controls.onConfirm}>
-						{operationLabel(operation)}
-					</button>
-					<button
+					<span>{operationLabel(operation)}</span>
+					<WorkspaceCommandButton
+						command={WorkspaceCommand.RunOperation({ target: item })}
 						type="button"
 						className={uiStyles.button}
-						aria-label="Cancel"
-						onClick={controls.onCancel}
-					>
-						Cancel
-					</button>
+					/>
+					<WorkspaceCommandButton
+						command={WorkspaceCommand.CancelMode()}
+						type="button"
+						className={uiStyles.button}
+					/>
 				</>
 			) : (
 				<>{operationLabel(operation)}</>

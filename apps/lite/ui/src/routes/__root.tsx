@@ -3,19 +3,8 @@ import { Link, Outlet, useMatch, useNavigate } from "@tanstack/react-router";
 import { FC, useState } from "react";
 import { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext } from "@tanstack/react-router";
-import { ShortcutButton } from "#ui/ShortcutButton.tsx";
 import { ShortcutsBarPortalContext } from "#ui/routes/project/$id/ShortcutsBar.tsx";
-import { isPreviewPanelVisible } from "#ui/routes/project/$id/state/layout.ts";
-import {
-	projectActions,
-	selectProjectLayoutState,
-} from "#ui/routes/project/$id/state/projectSlice.ts";
-import { useAppDispatch, useAppSelector } from "#ui/state/hooks.ts";
-import {
-	toggleFullscreenPreviewBinding,
-	togglePreviewBinding,
-} from "#ui/routes/project/$id/workspace/WorkspaceShortcuts.ts";
-import uiStyles from "#ui/ui.module.css";
+import { TopBarActionsPortalContext } from "#ui/routes/project/$id/TopBarActions.tsx";
 import styles from "./__root.module.css";
 
 export const lastOpenedProjectKey = "lastProject";
@@ -94,38 +83,9 @@ const SidebarNav: FC = () => {
 	);
 };
 
-const TopBarActions: FC = () => {
-	const dispatch = useAppDispatch();
-	const projectId = useMatch({
-		from: "/project/$id",
-	}).params.id;
-	const layoutState = useAppSelector((state) => selectProjectLayoutState(state, projectId));
-
-	return (
-		<div className={styles.topBarActions}>
-			<ShortcutButton
-				binding={togglePreviewBinding}
-				type="button"
-				className={uiStyles.button}
-				aria-pressed={isPreviewPanelVisible(layoutState)}
-				onClick={() => dispatch(projectActions.togglePreview({ projectId }))}
-			>
-				{togglePreviewBinding.description}
-			</ShortcutButton>
-			<ShortcutButton
-				binding={toggleFullscreenPreviewBinding}
-				type="button"
-				className={uiStyles.button}
-				aria-pressed={layoutState.isFullscreenPreviewOpen}
-				onClick={() => dispatch(projectActions.toggleFullscreenPreview({ projectId }))}
-			>
-				{toggleFullscreenPreviewBinding.description}
-			</ShortcutButton>
-		</div>
-	);
-};
-
-const TopBar: FC = () => {
+const TopBar: FC<{
+	actionsRef: (element: HTMLDivElement | null) => void;
+}> = ({ actionsRef }) => {
 	const projectMatch = useMatch({
 		from: "/project/$id",
 		shouldThrow: false,
@@ -134,27 +94,30 @@ const TopBar: FC = () => {
 	return (
 		<header className={styles.topBar}>
 			<ProjectSelect />
-			{projectMatch && <TopBarActions />}
+			{projectMatch && <div className={styles.topBarActions} ref={actionsRef} />}
 		</header>
 	);
 };
 
 function RootLayout() {
 	const [shortcutsBarPortalNode, setShortcutsBarPortalNode] = useState<HTMLElement | null>(null);
+	const [topBarActionsPortalNode, setTopBarActionsPortalNode] = useState<HTMLElement | null>(null);
 
 	return (
-		<ShortcutsBarPortalContext value={shortcutsBarPortalNode}>
-			<main className={styles.layout}>
-				<TopBar />
-				<aside className={styles.sidebar}>
-					<SidebarNav />
-				</aside>
-				<section className={styles.content}>
-					<Outlet />
-				</section>
-				<footer className={styles.shortcutsBarFooter} ref={setShortcutsBarPortalNode} />
-			</main>
-		</ShortcutsBarPortalContext>
+		<TopBarActionsPortalContext value={topBarActionsPortalNode}>
+			<ShortcutsBarPortalContext value={shortcutsBarPortalNode}>
+				<main className={styles.layout}>
+					<TopBar actionsRef={setTopBarActionsPortalNode} />
+					<aside className={styles.sidebar}>
+						<SidebarNav />
+					</aside>
+					<section className={styles.content}>
+						<Outlet />
+					</section>
+					<footer className={styles.shortcutsBarFooter} ref={setShortcutsBarPortalNode} />
+				</main>
+			</ShortcutsBarPortalContext>
+		</TopBarActionsPortalContext>
 	);
 }
 

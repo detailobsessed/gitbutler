@@ -5,9 +5,7 @@ import {
 import { classes } from "#ui/classes.ts";
 import { changesSectionFileParent, commitFileParent } from "#ui/domain/FileParent.ts";
 import { type GetDataParams, useDroppable } from "#ui/hooks/useDroppable.ts";
-import { getInsertionSide, useRunOperation, type Operation } from "#ui/Operation.ts";
-import { projectActions } from "#ui/routes/project/$id/state/projectSlice.ts";
-import { useAppDispatch } from "#ui/state/hooks.ts";
+import { getInsertionSide, type Operation } from "#ui/Operation.ts";
 import { mergeProps, useRender } from "@base-ui/react";
 import { Match, pipe } from "effect";
 import { FC } from "react";
@@ -63,9 +61,6 @@ const useOperationTarget = ({
 		args: GetDataParams[0] & { resolvedOperationSource: ResolvedOperationSource },
 	) => Operation | null;
 }) => {
-	const dispatch = useAppDispatch();
-	const runOperation = useRunOperation();
-
 	const [drag, dropRef] = useDragOperation({ projectId, getOperation });
 
 	const resolveOperationSource = useResolveOperationSource(projectId);
@@ -83,25 +78,13 @@ const useOperationTarget = ({
 				})
 			: null;
 
-	const confirmMode = () => {
-		dispatch(projectActions.exitMode({ projectId }));
-
-		if (!operationModeOperation) return;
-
-		runOperation(projectId, operationModeOperation);
-	};
-
-	const cancelMode = () => dispatch(projectActions.exitMode({ projectId }));
-
 	return {
 		drag,
 		dropRef,
 		isActiveTarget: !!drag?.operation || isActiveOperationModeTarget,
 		source: drag?.operationSource ?? operationMode?.source,
 		operation: drag?.operation ?? operationModeOperation,
-		controls: isActiveOperationModeTarget
-			? { onConfirm: confirmMode, onCancel: cancelMode }
-			: undefined,
+		controls: isActiveOperationModeTarget,
 	};
 };
 

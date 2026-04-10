@@ -1,10 +1,6 @@
 import { Match } from "effect";
 
-export type ShortcutActionBase = {
-	_tag: string;
-};
-
-export type ShortcutBinding<Action extends ShortcutActionBase> = {
+export type ShortcutBinding<Action> = {
 	id: string;
 	description: string;
 	keys: Array<string>;
@@ -66,7 +62,7 @@ const eventMatchesShortcutKey = (event: KeyboardEvent, shortcutKey: string): boo
 	);
 };
 
-export const getAction = <Action extends ShortcutActionBase>(
+export const getAction = <Action>(
 	bindings: Array<ShortcutBinding<Action>>,
 	event: KeyboardEvent,
 ): Action | null => {
@@ -105,6 +101,3 @@ const formatShortcutKey = (key: string): string => {
 
 export const formatShortcutKeys = (keys: Array<string>): string =>
 	keys.map((key) => formatShortcutKey(key)).join("/");
-
-export const bindingButtonLabel = (binding: ShortcutBinding<ShortcutActionBase>): string =>
-	`${binding.description} (${formatShortcutKeys(binding.keys)})`;
