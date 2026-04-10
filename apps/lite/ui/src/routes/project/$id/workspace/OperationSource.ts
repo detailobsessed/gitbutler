@@ -1,11 +1,7 @@
-import {
-	changesSectionFileParent,
-	commitFileParent,
-	type FileParent,
-} from "#ui/domain/FileParent.ts";
+import { FileParent } from "#ui/domain/FileParent.ts";
 import { type HunkHeader } from "@gitbutler/but-sdk";
-import { Match } from "effect";
-import { type Item } from "./Item.ts";
+import { Data, Match } from "effect";
+import { Item } from "./Item.ts";
 
 /** @public */
 export type ChangesSectionOperationSource = { stackId: string | null };
@@ -22,57 +18,19 @@ export type SegmentOperationSource = { branchRef: Array<number> | null };
  * The source of an operation before it has been materialized into data that can
  * be sent to the backend (`ResolvedOperationSource`).
  */
-export type OperationSource =
-	| { _tag: "BaseCommit" }
-	| ({ _tag: "ChangesSection" } & ChangesSectionOperationSource)
-	| ({ _tag: "Commit" } & CommitOperationSource)
-	| ({ _tag: "File" } & FileOperationSource)
-	| ({ _tag: "Hunk" } & HunkOperationSource)
-	| ({ _tag: "Segment" } & SegmentOperationSource);
+export type OperationSource = Data.TaggedEnum<{
+	BaseCommit: {};
+	ChangesSection: ChangesSectionOperationSource;
+	Commit: CommitOperationSource;
+	File: FileOperationSource;
+	Hunk: HunkOperationSource;
+	Segment: SegmentOperationSource;
+}>;
+
+export const OperationSource = Data.taggedEnum<OperationSource>();
 
 /** @public */
-export const baseCommitOperationSource: OperationSource = {
-	_tag: "BaseCommit",
-};
-
-/** @public */
-export const changesSectionOperationSource = ({
-	stackId,
-}: ChangesSectionOperationSource): OperationSource => ({
-	_tag: "ChangesSection",
-	stackId,
-});
-
-/** @public */
-export const commitOperationSource = ({ commitId }: CommitOperationSource): OperationSource => ({
-	_tag: "Commit",
-	commitId,
-});
-
-/** @public */
-export const fileOperationSource = ({ parent, path }: FileOperationSource): OperationSource => ({
-	_tag: "File",
-	parent,
-	path,
-});
-
-/** @public */
-export const hunkOperationSource = ({
-	parent,
-	path,
-	hunkHeader,
-}: HunkOperationSource): OperationSource => ({
-	_tag: "Hunk",
-	parent,
-	path,
-	hunkHeader,
-});
-
-/** @public */
-export const segmentOperationSource = ({ branchRef }: SegmentOperationSource): OperationSource => ({
-	_tag: "Segment",
-	branchRef,
-});
+export const baseCommitOperationSource: OperationSource = OperationSource.BaseCommit();
 
 const operationSourceIdentityKey = (operationSource: OperationSource): string =>
 	Match.value(operationSource).pipe(
@@ -94,18 +52,18 @@ export const operationSourceFromItem = (item: Item): OperationSource =>
 		Match.tagsExhaustive({
 			BaseCommit: () => baseCommitOperationSource,
 			Change: ({ stackId, path }) =>
-				fileOperationSource({
-					parent: changesSectionFileParent({ stackId }),
+				OperationSource.File({
+					parent: FileParent.ChangesSection({ stackId }),
 					path,
 				}),
-			ChangesSection: ({ stackId }) => changesSectionOperationSource({ stackId }),
-			Commit: ({ commitId }) => commitOperationSource({ commitId }),
+			ChangesSection: ({ stackId }) => OperationSource.ChangesSection({ stackId }),
+			Commit: ({ commitId }) => OperationSource.Commit({ commitId }),
 			CommitFile: ({ commitId, path }) =>
-				fileOperationSource({
-					parent: commitFileParent({ commitId }),
+				OperationSource.File({
+					parent: FileParent.Commit({ commitId }),
 					path,
 				}),
-			Segment: ({ branchRef }) => segmentOperationSource({ branchRef }),
+			Segment: ({ branchRef }) => OperationSource.Segment({ branchRef }),
 		}),
 	);
 

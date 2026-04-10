@@ -1,19 +1,18 @@
+import { Data } from "effect";
+
 export type Panel = "primary" | "preview";
 
 /** @public */
 export type SplitPanelLayout = { focus: Panel };
-export type PanelLayout = { _tag: "Primary" } | ({ _tag: "Split" } & SplitPanelLayout);
+export type PanelLayout = Data.TaggedEnum<{
+	Primary: {};
+	Split: SplitPanelLayout;
+}>;
+
+export const PanelLayout = Data.taggedEnum<PanelLayout>();
 
 /** @public */
-export const primaryPanelLayout: PanelLayout = {
-	_tag: "Primary",
-};
-
-/** @public */
-export const splitPanelLayout = ({ focus }: SplitPanelLayout): PanelLayout => ({
-	_tag: "Split",
-	focus,
-});
+export const primaryPanelLayout: PanelLayout = PanelLayout.Primary();
 
 export type ProjectLayoutState = {
 	isFullscreenPreviewOpen: boolean;
@@ -22,7 +21,7 @@ export type ProjectLayoutState = {
 
 export const createInitialState = (): ProjectLayoutState => ({
 	isFullscreenPreviewOpen: false,
-	panelLayout: splitPanelLayout({ focus: "primary" }),
+	panelLayout: PanelLayout.Split({ focus: "primary" }),
 });
 
 export const initialState: ProjectLayoutState = createInitialState();
@@ -45,12 +44,12 @@ export const focusPrimary = (state: ProjectLayoutState) => {
 	state.panelLayout =
 		state.panelLayout._tag === "Primary"
 			? state.panelLayout
-			: splitPanelLayout({ focus: "primary" });
+			: PanelLayout.Split({ focus: "primary" });
 };
 
 export const focusPreview = (state: ProjectLayoutState) => {
 	if (state.isFullscreenPreviewOpen) return;
-	state.panelLayout = splitPanelLayout({ focus: "preview" });
+	state.panelLayout = PanelLayout.Split({ focus: "preview" });
 };
 
 export const openFullscreenPreview = (state: ProjectLayoutState) => {
@@ -64,7 +63,7 @@ export const toggleFullscreenPreview = (state: ProjectLayoutState) => {
 export const togglePreview = (state: ProjectLayoutState) => {
 	state.panelLayout =
 		state.panelLayout._tag === "Primary"
-			? splitPanelLayout({ focus: "primary" })
+			? PanelLayout.Split({ focus: "primary" })
 			: primaryPanelLayout;
 };
 

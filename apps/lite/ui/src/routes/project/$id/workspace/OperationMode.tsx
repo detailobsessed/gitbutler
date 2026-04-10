@@ -1,5 +1,5 @@
 import { type Operation } from "#ui/Operation.ts";
-import { changesSectionFileParent, commitFileParent } from "#ui/domain/FileParent.ts";
+import { FileParent } from "#ui/domain/FileParent.ts";
 import { Match } from "effect";
 import { type Item } from "./Item.ts";
 import {
@@ -24,12 +24,12 @@ const rubModeOperationSourceToOperation = ({
 			ChangesSection: (target) =>
 				getCombineOperation({
 					resolvedOperationSource,
-					target: changesSectionFileParent({ stackId: target.stackId }),
+					target: FileParent.ChangesSection({ stackId: target.stackId }),
 				}),
 			Commit: (target) =>
 				getCombineOperation({
 					resolvedOperationSource,
-					target: commitFileParent({ commitId: target.commitId }),
+					target: FileParent.Commit({ commitId: target.commitId }),
 				}),
 		}),
 		Match.orElse(() => null),

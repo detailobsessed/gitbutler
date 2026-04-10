@@ -21,11 +21,7 @@ import {
 	MenuTriggerIcon,
 	PushIcon,
 } from "#ui/components/icons.tsx";
-import {
-	changesSectionFileParent,
-	commitFileParent,
-	type FileParent,
-} from "#ui/domain/FileParent.ts";
+import { FileParent } from "#ui/domain/FileParent.ts";
 import { getBranchNameByCommitId, getCommonBaseCommitId } from "#ui/domain/RefInfo.ts";
 import { ProjectPreviewLayout } from "#ui/routes/project/$id/ProjectPreviewLayout.tsx";
 import { getFocus } from "#ui/routes/project/$id/state/layout.ts";
@@ -99,16 +95,11 @@ import { Route as projectRoute } from "#ui/routes/project/$id/route.tsx";
 import { useAppDispatch, useAppSelector } from "#ui/state/hooks.ts";
 import sharedStyles from "../shared.module.css";
 import {
+	Item,
 	baseCommitItem,
-	changeItem,
-	changesSectionItem,
-	CommitFileItem,
-	commitFileItem,
-	CommitItem,
-	commitItem,
-	type Item,
-	SegmentItem,
-	segmentItem,
+	type CommitFileItem,
+	type CommitItem,
+	type SegmentItem,
 } from "./Item.ts";
 import {
 	buildNavigationIndex,
@@ -129,11 +120,7 @@ import {
 import { PositionedShortcutsBar } from "../ShortcutsBar.tsx";
 import { formatShortcutKeys, ShortcutActionBase, type ShortcutBinding } from "#ui/shortcuts.ts";
 import styles from "./route.module.css";
-import {
-	fileOperationSource,
-	hunkOperationSource,
-	operationSourceFromItem,
-} from "./OperationSource.ts";
+import { OperationSource, operationSourceFromItem } from "./OperationSource.ts";
 import {
 	getOperationMode,
 	normalizeWorkspaceMode,
@@ -298,7 +285,7 @@ const Hunk: FC<{
 		>
 			{fileParent && editable
 				? (() => {
-						const source = hunkOperationSource({
+						const source = OperationSource.Hunk({
 							parent: fileParent,
 							path: change.path,
 							hunkHeader: hunk,
@@ -486,8 +473,8 @@ const ChangesPreview: FC<{
 			) : (
 				<ul>
 					{changesWithDiffs.map(([change, diff]) => {
-						const parent = changesSectionFileParent({ stackId });
-						const source = fileOperationSource({ parent, path: change.path });
+						const parent = FileParent.ChangesSection({ stackId });
+						const source = OperationSource.File({ parent, path: change.path });
 						return (
 							<li key={change.path}>
 								<OperationSourceC
@@ -563,8 +550,8 @@ const CommitPreview: FC<{
 			) : (
 				<ul>
 					{changesWithDiffs.map(([change, diff]) => {
-						const parent = commitFileParent({ commitId });
-						const source = fileOperationSource({ parent, path: change.path });
+						const parent = FileParent.Commit({ commitId });
+						const source = OperationSource.File({ parent, path: change.path });
 						return (
 							<li key={change.path}>
 								{editable ? (
@@ -888,13 +875,13 @@ const CommitRow: FC<
 	...restProps
 }) => {
 	const dispatch = useAppDispatch();
-	const commitItemV: CommitItem = {
+	const commitItem: CommitItem = {
 		stackId,
 		segmentIndex,
 		branchRef,
 		commitId: commit.id,
 	};
-	const item = commitItem(commitItemV);
+	const item = Item.Commit(commitItem);
 	const isRewording =
 		selected !== null &&
 		workspaceMode._tag === "RewordCommit" &&
@@ -913,7 +900,7 @@ const CommitRow: FC<
 	const commitReword = useMutation(commitRewordMutationOptions);
 
 	const startEditing = () => {
-		dispatch(projectActions.startRewordCommit({ projectId, item: commitItemV }));
+		dispatch(projectActions.startRewordCommit({ projectId, item: commitItem }));
 	};
 
 	const endEditing = () => {
@@ -997,7 +984,7 @@ const CommitRow: FC<
 									className={sharedStyles.itemRowAction}
 									type="button"
 									onClick={() =>
-										dispatch(projectActions.toggleCommitFiles({ projectId, item: commitItemV }))
+										dispatch(projectActions.toggleCommitFiles({ projectId, item: commitItem }))
 									}
 									aria-expanded={isExpanded}
 									aria-label={isExpanded ? "Hide commit files" : "Show commit files"}
@@ -1045,7 +1032,7 @@ const CommitFileRow: FC<{
 	projectId: string;
 }> = ({ change, operationMode, parentCommitItem, isSelected, navigationIndex, projectId }) => {
 	const dispatch = useAppDispatch();
-	const item = commitFileItem({ ...parentCommitItem, path: change.path });
+	const item = Item.CommitFile({ ...parentCommitItem, path: change.path });
 
 	return (
 		<OperationSourceC
@@ -1101,8 +1088,8 @@ const CommitC: FC<{
 	const isHighlighted = useAppSelector((state) =>
 		selectProjectHighlightedCommitIds(state, projectId).includes(commit.id),
 	);
-	const commitItemV: CommitItem = { stackId, segmentIndex, branchRef, commitId: commit.id };
-	const item = commitItem(commitItemV);
+	const commitItem: CommitItem = { stackId, segmentIndex, branchRef, commitId: commit.id };
+	const item = Item.Commit(commitItem);
 	return (
 		<OperationSourceC
 			operationMode={operationMode}
@@ -1141,7 +1128,7 @@ const CommitC: FC<{
 							<CommitFileRow
 								change={change}
 								operationMode={operationMode}
-								parentCommitItem={commitItemV}
+								parentCommitItem={commitItem}
 								isSelected={selectedFile?.path === change.path}
 								navigationIndex={navigationIndex}
 								projectId={projectId}
@@ -1201,7 +1188,7 @@ const ChangeRow: FC<{
 	stackId,
 }) => {
 	const dispatch = useAppDispatch();
-	const item = changeItem({ stackId, path: change.path });
+	const item = Item.Change({ stackId, path: change.path });
 	return (
 		<OperationSourceC
 			operationMode={operationMode}
@@ -1301,7 +1288,7 @@ const ChangesSectionRow: FC<{
 
 	return (
 		<ItemRow
-			inert={!navigationIndexIncludes(navigationIndex, changesSectionItem({ stackId }))}
+			inert={!navigationIndexIncludes(navigationIndex, Item.ChangesSection({ stackId }))}
 			isSelected={isSelected}
 		>
 			<ContextMenu.Root>
@@ -1314,7 +1301,7 @@ const ChangesSectionRow: FC<{
 								dispatch(
 									projectActions.selectItem({
 										projectId,
-										item: changesSectionItem({ stackId }),
+										item: Item.ChangesSection({ stackId }),
 									}),
 								);
 							}}
@@ -1415,7 +1402,7 @@ const Changes: FC<{
 	const changes = worktreeChanges.changes.filter((change) => assignmentsByPath.has(change.path));
 	const isSectionSelected = isSelected || selectedPath !== null;
 
-	const item = changesSectionItem({ stackId });
+	const item = Item.ChangesSection({ stackId });
 
 	const dispatch = useAppDispatch();
 
@@ -1423,7 +1410,7 @@ const Changes: FC<{
 		dispatch(
 			projectActions.enterMoveMode({
 				projectId,
-				source: operationSourceFromItem(changesSectionItem({ stackId })),
+				source: operationSourceFromItem(Item.ChangesSection({ stackId })),
 			}),
 		);
 
@@ -1565,12 +1552,12 @@ const SegmentRow: FC<
 	const dispatch = useAppDispatch();
 	const branchName = segment.refName?.displayName ?? null;
 	const branchRef = segment.refName?.fullNameBytes ?? null;
-	const segmentItemV: SegmentItem = {
+	const segmentItem: SegmentItem = {
 		stackId,
 		segmentIndex,
 		branchRef,
 	};
-	const item = segmentItem(segmentItemV);
+	const item = Item.Segment(segmentItem);
 	const isRenaming =
 		selected !== null &&
 		workspaceMode._tag === "RenameBranch" &&
@@ -1586,7 +1573,7 @@ const SegmentRow: FC<
 
 	const startEditing = () => {
 		if (branchName === null) return;
-		dispatch(projectActions.startRenameBranch({ projectId, item: segmentItemV }));
+		dispatch(projectActions.startRenameBranch({ projectId, item: segmentItem }));
 	};
 
 	const endEditing = () => {
@@ -1615,7 +1602,7 @@ const SegmentRow: FC<
 			dispatch(
 				projectActions.selectItem({
 					projectId,
-					item: segmentItem({
+					item: Item.Segment({
 						stackId,
 						segmentIndex,
 						// TODO: ideally the API would return the new ref?

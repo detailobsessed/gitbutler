@@ -1,6 +1,6 @@
 import { Toast } from "@base-ui/react";
 import { useMutation } from "@tanstack/react-query";
-import { Match } from "effect";
+import { Data, Match } from "effect";
 import {
 	type AssignHunkParams,
 	type CommitAmendParams,
@@ -54,90 +54,21 @@ export type MoveBranchOperation = Omit<MoveBranchParams, "projectId">;
 /** @public */
 export type TearOffBranchOperation = Omit<TearOffBranchParams, "projectId">;
 
-export type Operation =
-	| ({ _tag: "AssignHunk" } & AssignHunkOperation)
-	| ({ _tag: "CommitAmend" } & CommitAmendOperation)
-	| ({ _tag: "CommitCreate" } & CommitCreateOperation)
-	| ({ _tag: "CommitCreateFromCommittedChanges" } & CommitCreateFromCommittedChangesOperation)
-	| ({ _tag: "CommitMove" } & CommitMoveOperation)
-	| ({ _tag: "CommitMoveChangesBetween" } & CommitMoveChangesBetweenOperation)
-	| ({ _tag: "CommitSquash" } & CommitSquashOperation)
-	| ({ _tag: "CommitUncommit" } & CommitUncommitOperation)
-	| ({ _tag: "CommitUncommitChanges" } & CommitUncommitChangesOperation)
-	| ({ _tag: "MoveBranch" } & MoveBranchOperation)
-	| ({ _tag: "TearOffBranch" } & TearOffBranchOperation);
+export type Operation = Data.TaggedEnum<{
+	AssignHunk: AssignHunkOperation;
+	CommitAmend: CommitAmendOperation;
+	CommitCreate: CommitCreateOperation;
+	CommitCreateFromCommittedChanges: CommitCreateFromCommittedChangesOperation;
+	CommitMove: CommitMoveOperation;
+	CommitMoveChangesBetween: CommitMoveChangesBetweenOperation;
+	CommitSquash: CommitSquashOperation;
+	CommitUncommit: CommitUncommitOperation;
+	CommitUncommitChanges: CommitUncommitChangesOperation;
+	MoveBranch: MoveBranchOperation;
+	TearOffBranch: TearOffBranchOperation;
+}>;
 
-/** @public */
-export const assignHunkOperation = (operation: AssignHunkOperation): Operation => ({
-	_tag: "AssignHunk",
-	...operation,
-});
-
-/** @public */
-export const commitAmendOperation = (operation: CommitAmendOperation): Operation => ({
-	_tag: "CommitAmend",
-	...operation,
-});
-
-/** @public */
-export const commitCreateOperation = (operation: CommitCreateOperation): Operation => ({
-	_tag: "CommitCreate",
-	...operation,
-});
-
-/** @public */
-export const commitCreateFromCommittedChangesOperation = (
-	operation: CommitCreateFromCommittedChangesOperation,
-): Operation => ({
-	_tag: "CommitCreateFromCommittedChanges",
-	...operation,
-});
-
-/** @public */
-export const commitMoveOperation = (operation: CommitMoveOperation): Operation => ({
-	_tag: "CommitMove",
-	...operation,
-});
-
-/** @public */
-export const commitMoveChangesBetweenOperation = (
-	operation: CommitMoveChangesBetweenOperation,
-): Operation => ({
-	_tag: "CommitMoveChangesBetween",
-	...operation,
-});
-
-/** @public */
-export const commitSquashOperation = (operation: CommitSquashOperation): Operation => ({
-	_tag: "CommitSquash",
-	...operation,
-});
-
-/** @public */
-export const commitUncommitOperation = (operation: CommitUncommitOperation): Operation => ({
-	_tag: "CommitUncommit",
-	...operation,
-});
-
-/** @public */
-export const commitUncommitChangesOperation = (
-	operation: CommitUncommitChangesOperation,
-): Operation => ({
-	_tag: "CommitUncommitChanges",
-	...operation,
-});
-
-/** @public */
-export const moveBranchOperation = (operation: MoveBranchOperation): Operation => ({
-	_tag: "MoveBranch",
-	...operation,
-});
-
-/** @public */
-export const tearOffBranchOperation = (operation: TearOffBranchOperation): Operation => ({
-	_tag: "TearOffBranch",
-	...operation,
-});
+export const Operation = Data.taggedEnum<Operation>();
 
 export const getInsertionSide = (operation: Operation): InsertSide | null =>
 	Match.value(operation).pipe(

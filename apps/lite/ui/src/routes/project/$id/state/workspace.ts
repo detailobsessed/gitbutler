@@ -1,19 +1,6 @@
-import {
-	commitItem,
-	segmentItem,
-	type CommitItem,
-	type Item,
-	type SegmentItem,
-} from "../workspace/Item.ts";
+import { Item, type CommitItem, type SegmentItem } from "../workspace/Item.ts";
 import { type OperationSource } from "../workspace/OperationSource.ts";
-import {
-	defaultWorkspaceMode,
-	moveOperationMode,
-	renameBranchWorkspaceMode,
-	rewordCommitWorkspaceMode,
-	rubOperationMode,
-	type WorkspaceMode,
-} from "../workspace/WorkspaceMode.ts";
+import { WorkspaceMode, defaultWorkspaceMode } from "../workspace/WorkspaceMode.ts";
 
 export type WorkspaceSelectionState = {
 	hunk: string | null;
@@ -54,15 +41,15 @@ const normalizeModeForSelectedItem = (mode: WorkspaceMode, item: Item | null) =>
 
 export const closeCommitFiles = (state: WorkspaceState, item: CommitItem) => {
 	state.expandedCommitId = null;
-	selectItem(state, commitItem(item));
+	selectItem(state, Item.Commit(item));
 };
 
 export const enterMoveMode = (state: WorkspaceState, source: OperationSource) => {
-	state.mode = moveOperationMode({ source });
+	state.mode = WorkspaceMode.Move({ source });
 };
 
 export const enterRubMode = (state: WorkspaceState, source: OperationSource) => {
-	state.mode = rubOperationMode({ source });
+	state.mode = WorkspaceMode.Rub({ source });
 };
 
 export const exitMode = (state: WorkspaceState) => {
@@ -71,7 +58,7 @@ export const exitMode = (state: WorkspaceState) => {
 
 export const openCommitFiles = (state: WorkspaceState, item: CommitItem) => {
 	state.expandedCommitId = item.commitId;
-	selectItem(state, commitItem(item));
+	selectItem(state, Item.Commit(item));
 };
 
 export const selectHunk = (state: WorkspaceState, hunk: string | null) => {
@@ -93,16 +80,16 @@ export const setHighlightedCommitIds = (state: WorkspaceState, commitIds: Array<
 };
 
 export const startRenameBranch = (state: WorkspaceState, item: SegmentItem) => {
-	selectItem(state, segmentItem(item));
-	state.mode = renameBranchWorkspaceMode({
+	selectItem(state, Item.Segment(item));
+	state.mode = WorkspaceMode.RenameBranch({
 		stackId: item.stackId,
 		segmentIndex: item.segmentIndex,
 	});
 };
 
 export const startRewordCommit = (state: WorkspaceState, item: CommitItem) => {
-	selectItem(state, commitItem(item));
-	state.mode = rewordCommitWorkspaceMode({ commitId: item.commitId });
+	selectItem(state, Item.Commit(item));
+	state.mode = WorkspaceMode.RewordCommit({ commitId: item.commitId });
 };
 
 export const toggleCommitFiles = (state: WorkspaceState, item: CommitItem) => {

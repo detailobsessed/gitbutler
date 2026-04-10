@@ -9,17 +9,12 @@ import { Match } from "effect";
 import { RefObject, useEffect, useEffectEvent } from "react";
 import {
 	baseCommitItem,
-	changeItem,
-	commitFileItem,
-	commitItem,
 	type ChangeItem,
-	changesSectionItem,
-	type ChangesSectionItem,
+	ChangesSectionItem,
 	type CommitFileItem,
 	type CommitItem,
 	getParentSection,
-	type Item,
-	segmentItem,
+	Item,
 	type SegmentItem,
 } from "./Item.ts";
 import { operationModeToOperation } from "./OperationMode.tsx";
@@ -743,7 +738,7 @@ export const useWorkspaceShortcuts = ({
 		Match.value(action).pipe(
 			Match.tags({
 				FocusPreview: () => dispatch(projectActions.focusPreview({ projectId })),
-				SelectUnassignedChanges: () => selectItem(changesSectionItem({ stackId: null })),
+				SelectUnassignedChanges: () => selectItem(Item.ChangesSection({ stackId: null })),
 				ToggleFullscreenPreview: () =>
 					dispatch(projectActions.toggleFullscreenPreview({ projectId })),
 				TogglePreview: () => dispatch(projectActions.togglePreview({ projectId })),
@@ -788,7 +783,7 @@ export const useWorkspaceShortcuts = ({
 				ToggleFiles: () =>
 					dispatch(projectActions.toggleCommitFiles({ projectId, item: selectedItem })),
 			}),
-			Match.orElse((action) => handlePrimaryPanelAction(action, commitItem(selectedItem))),
+			Match.orElse((action) => handlePrimaryPanelAction(action, Item.Commit(selectedItem))),
 		);
 
 	const handleCommitFileScopeAction = (action: CommitFileAction, selectedItem: CommitFileItem) =>
@@ -799,7 +794,7 @@ export const useWorkspaceShortcuts = ({
 				ToggleFiles: () =>
 					dispatch(projectActions.toggleCommitFiles({ projectId, item: selectedItem })),
 			}),
-			Match.orElse((action) => handlePrimaryPanelAction(action, commitFileItem(selectedItem))),
+			Match.orElse((action) => handlePrimaryPanelAction(action, Item.CommitFile(selectedItem))),
 		);
 
 	const handleBranchScopeAction = (action: BranchAction, selectedItem: SegmentItem) =>
@@ -813,7 +808,7 @@ export const useWorkspaceShortcuts = ({
 						}),
 					),
 			}),
-			Match.orElse((action) => handlePrimaryPanelAction(action, segmentItem(selectedItem))),
+			Match.orElse((action) => handlePrimaryPanelAction(action, Item.Segment(selectedItem))),
 		);
 
 	const handleDefaultScopeKeyDown = (scope: DefaultModeScope, event: KeyboardEvent) =>
@@ -835,13 +830,13 @@ export const useWorkspaceShortcuts = ({
 					const action = getAction(scope.bindings, event);
 					if (!action) return;
 					event.preventDefault();
-					handleChangesScopeAction(action, changeItem(scope.context));
+					handleChangesScopeAction(action, Item.Change(scope.context));
 				},
 				ChangesSection: (scope) => {
 					const action = getAction(scope.bindings, event);
 					if (!action) return;
 					event.preventDefault();
-					handleChangesScopeAction(action, changesSectionItem(scope.context));
+					handleChangesScopeAction(action, Item.ChangesSection(scope.context));
 				},
 				Commit: (scope) => {
 					const action = getAction(scope.bindings, event);
@@ -859,7 +854,7 @@ export const useWorkspaceShortcuts = ({
 					const action = getAction(scope.bindings, event);
 					if (!action) return;
 					event.preventDefault();
-					handlePrimaryPanelAction(action, segmentItem(scope.context));
+					handlePrimaryPanelAction(action, Item.Segment(scope.context));
 				},
 			}),
 		);

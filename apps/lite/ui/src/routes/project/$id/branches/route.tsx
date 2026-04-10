@@ -22,7 +22,7 @@ import styles from "./route.module.css";
 import { applyBranchMutationOptions, unapplyStackMutationOptions } from "#ui/api/mutations.ts";
 import { listBranchesQueryOptions, listProjectsQueryOptions } from "#ui/api/queries.ts";
 import { CheckIcon, ArrowDownIcon, ArrowUpIcon, AddCircleIcon } from "#ui/components/icons.tsx";
-import { commitFileParent } from "#ui/domain/FileParent.ts";
+import { FileParent } from "#ui/domain/FileParent.ts";
 import { ProjectPreviewLayout } from "#ui/routes/project/$id/ProjectPreviewLayout.tsx";
 import {
 	CommitFiles,
@@ -35,19 +35,11 @@ import {
 	Patch,
 } from "#ui/routes/project/$id/shared.tsx";
 import { OperationSourceC } from "#ui/routes/project/$id/workspace/OperationSourceC.tsx";
-import { fileOperationSource } from "#ui/routes/project/$id/workspace/OperationSource.ts";
 import { Route as projectRoute } from "#ui/routes/project/$id/route.tsx";
+import { OperationSource } from "#ui/routes/project/$id/workspace/OperationSource.ts";
 import uiStyles from "#ui/ui.module.css";
 import sharedStyles from "../shared.module.css";
-import {
-	branchSelection,
-	commitSelection,
-	detailsCommitMode,
-	getDefaultSelection,
-	isValidBranchSelection,
-	type Selection,
-	summaryCommitMode,
-} from "./Selection.ts";
+import { CommitMode, Selection, getDefaultSelection, isValidBranchSelection } from "./Selection.ts";
 
 const FileDiff: FC<{
 	projectId: string;
@@ -110,10 +102,10 @@ const getExpandedCommitSelection = async ({
 		commitDetailsWithLineStatsQueryOptions({ projectId, commitId }),
 	);
 
-	return commitSelection({
+	return Selection.Commit({
 		branchName,
 		commitId,
-		mode: detailsCommitMode({ path: commitDetails.changes[0]?.path }),
+		mode: CommitMode.Details({ path: commitDetails.changes[0]?.path }),
 	});
 };
 
@@ -145,8 +137,8 @@ const ShowCommit: FC<{
 							{editable ? (
 								<OperationSourceC
 									projectId={projectId}
-									source={fileOperationSource({
-										parent: commitFileParent({ commitId: commit.id }),
+									source={OperationSource.File({
+										parent: FileParent.Commit({ commitId: commit.id }),
 										path: change.path,
 									})}
 								>
@@ -319,9 +311,9 @@ const BranchRow: FC<
 		select: (selection: Selection | null) => void;
 	} & ComponentProps<"div">
 > = ({ projectId, branch, selection, select, className, ...restProps }) => {
-	const branchSelectionV =
+	const branchSelection =
 		selection?._tag === "Branch" && selection.branchName === branch.name ? selection : null;
-	const commitSelectionV =
+	const commitSelection =
 		selection?._tag === "Commit" && selection.branchName === branch.name ? selection : null;
 
 	return (
@@ -329,7 +321,7 @@ const BranchRow: FC<
 			{...restProps}
 			className={classes(
 				sharedStyles.itemRow,
-				(branchSelectionV || commitSelectionV) && sharedStyles.itemRowSelected,
+				(branchSelection || commitSelection) && sharedStyles.itemRowSelected,
 				className,
 			)}
 		>
@@ -340,7 +332,7 @@ const BranchRow: FC<
 							type="button"
 							className={styles.branchButton}
 							onClick={() => {
-								select(branchSelection({ branchName: branch.name }));
+								select(Selection.Branch({ branchName: branch.name }));
 							}}
 						>
 							{branch.name}
@@ -384,7 +376,7 @@ const CommitRow: FC<{
 }> = ({ branchName, commit, projectId, selection, select, isHighlighted }) => {
 	const [isDetailsPending, startDetailsTransition] = useTransition();
 	const queryClient = useQueryClient();
-	const commitSelectionV =
+	const commitSelection =
 		selection?._tag === "Commit" &&
 		selection.branchName === branchName &&
 		selection.commitId === commit.id
@@ -393,12 +385,12 @@ const CommitRow: FC<{
 
 	const toggleDetails = () => {
 		startDetailsTransition(async () => {
-			if (commitSelectionV?.mode._tag === "Details") {
+			if (commitSelection?.mode._tag === "Details") {
 				select(
-					commitSelection({
+					Selection.Commit({
 						branchName,
 						commitId: commit.id,
-						mode: summaryCommitMode,
+						mode: CommitMode.Summary(),
 					}),
 				);
 				return;
@@ -418,7 +410,7 @@ const CommitRow: FC<{
 		<div
 			className={classes(
 				sharedStyles.itemRow,
-				commitSelectionV && sharedStyles.itemRowSelected,
+				commitSelection && sharedStyles.itemRowSelected,
 				isHighlighted && sharedStyles.itemRowHighlighted,
 			)}
 			style={{ ...(isDetailsPending && { opacity: 0.5 }) }}
@@ -429,10 +421,10 @@ const CommitRow: FC<{
 				className={sharedStyles.commitButton}
 				onClick={() => {
 					select(
-						commitSelection({
+						Selection.Commit({
 							branchName,
 							commitId: commit.id,
-							mode: summaryCommitMode,
+							mode: CommitMode.Summary(),
 						}),
 					);
 				}}
@@ -448,19 +440,17 @@ const CommitRow: FC<{
 					className={sharedStyles.itemRowAction}
 					type="button"
 					onClick={toggleDetails}
-					aria-expanded={commitSelectionV?.mode._tag === "Details"}
+					aria-expanded={commitSelection?.mode._tag === "Details"}
 					aria-label={
-						commitSelectionV?.mode._tag === "Details" ? "Hide commit files" : "Show commit files"
+						commitSelection?.mode._tag === "Details" ? "Hide commit files" : "Show commit files"
 					}
 				>
-					<ExpandCollapseIcon isExpanded={commitSelectionV?.mode._tag === "Details"} />
+					<ExpandCollapseIcon isExpanded={commitSelection?.mode._tag === "Details"} />
 				</Tooltip.Trigger>
 				<Tooltip.Portal>
 					<Tooltip.Positioner sideOffset={8}>
 						<Tooltip.Popup className={classes(uiStyles.popup, uiStyles.tooltip)}>
-							{commitSelectionV?.mode._tag === "Details"
-								? "Hide commit files"
-								: "Show commit files"}
+							{commitSelection?.mode._tag === "Details" ? "Hide commit files" : "Show commit files"}
 						</Tooltip.Popup>
 					</Tooltip.Positioner>
 				</Tooltip.Portal>
@@ -476,7 +466,7 @@ const CommitC: FC<{
 	selection: Selection | null;
 	select: (selection: Selection | null) => void;
 }> = ({ branchName, commit, projectId, selection, select }) => {
-	const commitSelectionV =
+	const commitSelection =
 		selection?._tag === "Commit" &&
 		selection.branchName === branchName &&
 		selection.commitId === commit.id
@@ -493,15 +483,15 @@ const CommitC: FC<{
 				select={select}
 				isHighlighted={false}
 			/>
-			{commitSelectionV?.mode._tag === "Details" && (
+			{commitSelection?.mode._tag === "Details" && (
 				<Suspense fallback={<div className={sharedStyles.itemRowEmpty}>Loading commit files…</div>}>
 					<CommitFiles
 						projectId={projectId}
 						commitId={commit.id}
 						renderFile={(change) => {
 							const isSelected =
-								commitSelectionV.mode._tag === "Details" &&
-								commitSelectionV.mode.path === change.path;
+								commitSelection.mode._tag === "Details" &&
+								commitSelection.mode.path === change.path;
 							return (
 								<div
 									className={classes(
@@ -514,10 +504,10 @@ const CommitC: FC<{
 										change={change}
 										onClick={() => {
 											select(
-												commitSelection({
+												Selection.Commit({
 													branchName,
 													commitId: commit.id,
-													mode: detailsCommitMode({ path: change.path }),
+													mode: CommitMode.Details({ path: change.path }),
 												}),
 											);
 										}}

@@ -1,4 +1,4 @@
-import { Match } from "effect";
+import { Data, Match } from "effect";
 
 /** @public */
 export type ChangesSectionItem = { stackId: string | null };
@@ -19,64 +19,19 @@ export type CommitFileItem = CommitItem & { path: string };
 /**
  * A selectable item in the primary panel.
  */
-export type Item =
-	| ({ _tag: "ChangesSection" } & ChangesSectionItem)
-	| ({ _tag: "Change" } & ChangeItem)
-	| ({ _tag: "Segment" } & SegmentItem)
-	| ({ _tag: "Commit" } & CommitItem)
-	| ({ _tag: "CommitFile" } & CommitFileItem)
-	| { _tag: "BaseCommit" };
+export type Item = Data.TaggedEnum<{
+	ChangesSection: ChangesSectionItem;
+	Change: ChangeItem;
+	Segment: SegmentItem;
+	Commit: CommitItem;
+	CommitFile: CommitFileItem;
+	BaseCommit: {};
+}>;
+
+export const Item = Data.taggedEnum<Item>();
 
 /** @public */
-export const changesSectionItem = ({ stackId }: ChangesSectionItem): Item => ({
-	_tag: "ChangesSection",
-	stackId,
-});
-
-/** @public */
-export const changeItem = ({ stackId, path }: ChangeItem): Item => ({
-	_tag: "Change",
-	stackId,
-	path,
-});
-
-/** @public */
-export const segmentItem = ({ stackId, segmentIndex, branchRef }: SegmentItem): Item => ({
-	_tag: "Segment",
-	stackId,
-	segmentIndex,
-	branchRef,
-});
-
-/** @public */
-export const commitItem = ({ stackId, segmentIndex, branchRef, commitId }: CommitItem): Item => ({
-	_tag: "Commit",
-	stackId,
-	segmentIndex,
-	branchRef,
-	commitId,
-});
-
-/** @public */
-export const commitFileItem = ({
-	stackId,
-	segmentIndex,
-	branchRef,
-	commitId,
-	path,
-}: CommitFileItem): Item => ({
-	_tag: "CommitFile",
-	stackId,
-	segmentIndex,
-	branchRef,
-	commitId,
-	path,
-});
-
-/** @public */
-export const baseCommitItem: Item = {
-	_tag: "BaseCommit",
-};
+export const baseCommitItem: Item = Item.BaseCommit();
 
 export const itemIdentityKey = (item: Item): string =>
 	Match.value(item).pipe(
@@ -98,19 +53,19 @@ export const getParentSection = (item: Item): Item | null =>
 	Match.value(item).pipe(
 		Match.tagsExhaustive({
 			Commit: (item) =>
-				segmentItem({
+				Item.Segment({
 					stackId: item.stackId,
 					segmentIndex: item.segmentIndex,
 					branchRef: item.branchRef,
 				}),
 			CommitFile: (item) =>
-				commitItem({
+				Item.Commit({
 					stackId: item.stackId,
 					segmentIndex: item.segmentIndex,
 					branchRef: item.branchRef,
 					commitId: item.commitId,
 				}),
-			Change: (item) => changesSectionItem({ stackId: item.stackId }),
+			Change: (item) => Item.ChangesSection({ stackId: item.stackId }),
 			ChangesSection: () => null,
 			BaseCommit: () => null,
 			Segment: () => null,

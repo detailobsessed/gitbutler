@@ -3,7 +3,7 @@ import {
 	extractInstruction,
 } from "@atlaskit/pragmatic-drag-and-drop-hitbox/list-item";
 import { classes } from "#ui/classes.ts";
-import { changesSectionFileParent, commitFileParent } from "#ui/domain/FileParent.ts";
+import { FileParent } from "#ui/domain/FileParent.ts";
 import { type GetDataParams, useDroppable } from "#ui/hooks/useDroppable.ts";
 import { getInsertionSide, useRunOperation, type Operation } from "#ui/Operation.ts";
 import { projectActions } from "#ui/routes/project/$id/state/projectSlice.ts";
@@ -117,7 +117,7 @@ const dropTargetToOperation = ({
 			ChangesSection: ({ stackId }) =>
 				getCombineOperation({
 					resolvedOperationSource,
-					target: changesSectionFileParent({ stackId }),
+					target: FileParent.ChangesSection({ stackId }),
 				}),
 			Segment: ({ branchRef }) =>
 				branchRef === null
@@ -129,7 +129,7 @@ const dropTargetToOperation = ({
 			Commit: ({ commitId }) =>
 				getCombineOperation({
 					resolvedOperationSource,
-					target: commitFileParent({ commitId }),
+					target: FileParent.Commit({ commitId }),
 				}),
 			BaseCommit: () => getTearOffBranchTargetOperation(resolvedOperationSource),
 		}),
@@ -184,7 +184,7 @@ const commitDropTargetToOperation = ({
 }) => {
 	const combine = getCombineOperation({
 		resolvedOperationSource,
-		target: commitFileParent({ commitId }),
+		target: FileParent.Commit({ commitId }),
 	});
 	const insertAbove = getCommitTargetMoveOperation({
 		resolvedOperationSource,

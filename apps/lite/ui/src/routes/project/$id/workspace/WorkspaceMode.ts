@@ -1,4 +1,4 @@
-import { Match } from "effect";
+import { Data, Match } from "effect";
 import { type OperationSource, operationSourceMatchesItem } from "./OperationSource.ts";
 import { type NavigationIndex } from "./WorkspaceModel.ts";
 
@@ -6,54 +6,24 @@ import { type NavigationIndex } from "./WorkspaceModel.ts";
 export type RubOperationMode = { source: OperationSource };
 /** @public */
 export type MoveOperationMode = { source: OperationSource };
-export type OperationMode =
-	| ({ _tag: "Rub" } & RubOperationMode)
-	| ({ _tag: "Move" } & MoveOperationMode);
 
 /** @public */
 export type RewordCommitWorkspaceMode = { commitId: string };
 /** @public */
 export type RenameBranchWorkspaceMode = { stackId: string; segmentIndex: number };
-export type WorkspaceMode =
-	| { _tag: "Default" }
-	| ({ _tag: "RewordCommit" } & RewordCommitWorkspaceMode)
-	| ({ _tag: "RenameBranch" } & RenameBranchWorkspaceMode)
-	| OperationMode;
+export type WorkspaceMode = Data.TaggedEnum<{
+	Default: {};
+	RewordCommit: RewordCommitWorkspaceMode;
+	RenameBranch: RenameBranchWorkspaceMode;
+	Rub: RubOperationMode;
+	Move: MoveOperationMode;
+}>;
+export type OperationMode = Extract<WorkspaceMode, { _tag: "Rub" | "Move" }>;
+
+export const WorkspaceMode = Data.taggedEnum<WorkspaceMode>();
 
 /** @public */
-export const rubOperationMode = ({ source }: RubOperationMode): OperationMode => ({
-	_tag: "Rub",
-	source,
-});
-
-/** @public */
-export const moveOperationMode = ({ source }: MoveOperationMode): OperationMode => ({
-	_tag: "Move",
-	source,
-});
-
-/** @public */
-export const defaultWorkspaceMode: WorkspaceMode = {
-	_tag: "Default",
-};
-
-/** @public */
-export const rewordCommitWorkspaceMode = ({
-	commitId,
-}: RewordCommitWorkspaceMode): WorkspaceMode => ({
-	_tag: "RewordCommit",
-	commitId,
-});
-
-/** @public */
-export const renameBranchWorkspaceMode = ({
-	stackId,
-	segmentIndex,
-}: RenameBranchWorkspaceMode): WorkspaceMode => ({
-	_tag: "RenameBranch",
-	stackId,
-	segmentIndex,
-});
+export const defaultWorkspaceMode: WorkspaceMode = WorkspaceMode.Default();
 
 export const getOperationMode = (mode: WorkspaceMode): OperationMode | null =>
 	mode._tag === "Rub" || mode._tag === "Move" ? mode : null;

@@ -6,16 +6,7 @@ import {
 import { Segment, type HunkAssignment, type RefInfo, type TreeChange } from "@gitbutler/but-sdk";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { type NonEmptyArray } from "effect/Array";
-import {
-	baseCommitItem,
-	changeItem,
-	changesSectionItem,
-	type Item,
-	commitItem,
-	commitFileItem,
-	itemIdentityKey,
-	segmentItem,
-} from "./Item.ts";
+import { Item, baseCommitItem, itemIdentityKey } from "./Item.ts";
 import { getRelative } from "../shared.tsx";
 
 const hasAssignmentsForPath = ({
@@ -54,10 +45,10 @@ const buildWorkspaceOutline = ({
 	expandedCommitPaths,
 }: BuildWorkspaceOutlineArgs): WorkspaceOutline => {
 	const changesSection = (stackId: string | null): WorkspaceSection => ({
-		section: changesSectionItem({ stackId }),
+		section: Item.ChangesSection({ stackId }),
 		children: changes.flatMap((change) =>
 			hasAssignmentsForPath({ assignments, stackId, path: change.path })
-				? [changeItem({ stackId, path: change.path })]
+				? [Item.Change({ stackId, path: change.path })]
 				: [],
 		),
 	});
@@ -69,12 +60,12 @@ const buildWorkspaceOutline = ({
 	): WorkspaceSection => {
 		const branchRef = segment.refName?.fullNameBytes ?? null;
 		return {
-			section: segmentItem({ stackId, segmentIndex, branchRef }),
+			section: Item.Segment({ stackId, segmentIndex, branchRef }),
 			children: segment.commits.flatMap((commit) => [
-				commitItem({ stackId, segmentIndex, branchRef, commitId: commit.id }),
+				Item.Commit({ stackId, segmentIndex, branchRef, commitId: commit.id }),
 				...(commit.id === expandedCommitId
 					? (expandedCommitPaths ?? []).map((path) =>
-							commitFileItem({
+							Item.CommitFile({
 								stackId,
 								segmentIndex,
 								branchRef,
