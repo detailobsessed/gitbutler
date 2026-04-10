@@ -83,8 +83,7 @@ where
     F: FnMut(String) -> Fut,
     Fut: std::future::Future<Output = Option<String>>,
 {
-    let mut envs = HashMap::new();
-    ensure_git_ssh_is_configured(&harness_env, &mut envs);
+    let envs = new_env_with_git_ssh_configured(&harness_env);
 
     if let Some(on_prompt) = on_prompt {
         execute_with_indirect_askpass(harness_env, executor, args, envs, on_prompt).await
@@ -302,27 +301,25 @@ where
         .map_err(Error::<E>::Exec)
 }
 
-/// Ensures that the SSH command for Git is configured via one of GIT_SSH or GIT_SSH_COMMAND in
-/// `envs`, or core.sshCommand in the Git-config. `envs` may be modified with the aforementioned
-/// environment variables if they are found in the environment.
+/// Create an environment variable mapping that is guaranteed to have the Git SSH command configured
+/// in either GIT_SSH_COMMAND or GIT_SSH.
 ///
-/// Resolution order reflects Git in that we first look for environment variables, and if those are
-/// not found we consider Git config.
+/// Resolution order reflects Git: GIT_SSH_COMMAND -> core.sshCommand -> GIT_SSH
+/// See https://github.com/git/git/blob/60f07c4f5c5f81c8a994d9e06b31a4a3a1679864/connect.c#L1382-L1397
 ///
-/// If no configuration is encountered in any of these locations, we add our own default
-/// configuration for `ssh` to GIT_SSH_COMMAND. This should be the case hit by the vast majority of
+/// If no configuration is encountered in any of these locations, we set our own default
+/// configuration for `ssh` in GIT_SSH_COMMAND. This should be the case hit by the vast majority of
 /// users, and it is tuned for what we believe is a good balance between security and convenience.
 ///
 /// Note that we never add any options to existing configuration. If the user has made explicit
 /// choices about how SSH should behave, we respect those choices and leave it to the user to deal
 /// with the consequences.
-fn ensure_git_ssh_is_configured<P>(harness_env: &HarnessEnv<P>, envs: &mut HashMap<String, String>)
+fn new_env_with_git_ssh_configured<P>(harness_env: &HarnessEnv<P>) -> HashMap<String, String>
 where
     P: AsRef<Path>,
 {
-    // Note: GIT_SSH_COMMAND takes precedence over GIT_SSH so there is no reason to try to resolve
-    // both.
-    //
+    let mut envs = HashMap::new();
+
     // Minor correctness issue: Neither GIT_SSH_COMMAND nor GIT_SSH are required to be unicode.
     // It's entirely possible to have non-unicode byte sequences in paths, for example. This should
     // be rewritten to use `std::env::var_os()` and the executor should be tweaked to let `envs`
@@ -330,18 +327,19 @@ where
     // so we'll keep it like this for now.
     if let Ok(git_ssh_command) = std::env::var("GIT_SSH_COMMAND") {
         envs.insert("GIT_SSH_COMMAND".into(), git_ssh_command);
-        return;
+        return envs;
+    }
+
+    if let Ok(Some(git_ssh_command)) = get_core_sshcommand(harness_env) {
+        // This move is a NOOP in most practical applications, but we do it for the simplicity of
+        // the GIT_SSH/GIT_SSH_COMMAND-is-configured invariant.
+        envs.insert("GIT_SSH_COMMAND".into(), git_ssh_command);
+        return envs;
     }
 
     if let Ok(git_ssh) = std::env::var("GIT_SSH") {
         envs.insert("GIT_SSH".into(), git_ssh);
-        return;
-    }
-
-    if get_core_sshcommand(harness_env).ok().is_some() {
-        // If there is an SSH command configured in Git config, we don't want to override it with
-        // environment variables. Git will pick up on it automatically.
-        return;
+        return envs;
     }
 
     // There is nothing preconfigured - we apply our own defaults.
@@ -362,6 +360,7 @@ where
         "ssh -o StrictHostKeyChecking=accept-new -o KbdInteractiveAuthentication=no{additional_options}"
     );
     envs.insert("GIT_SSH_COMMAND".into(), git_ssh_command);
+    envs
 }
 
 fn get_core_sshcommand<P>(harness_env: &HarnessEnv<P>) -> anyhow::Result<Option<String>>
