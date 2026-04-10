@@ -195,8 +195,7 @@ where
     envs.insert("SSH_ASKPASS".into(), askpath_path.display().to_string());
     envs.insert("SSH_ASKPASS_REQUIRE".into(), "force".into());
 
-    let git_ssh_command = resolve_git_ssh_command(&harness_env, &envs);
-    envs.insert("GIT_SSH_COMMAND".into(), git_ssh_command);
+    ensure_git_ssh_is_configured(&harness_env, &mut envs);
 
     let cwd = match harness_env {
         HarnessEnv::Repo(p) | HarnessEnv::Global(p) => p,
@@ -295,10 +294,7 @@ where
     E: GitExecutor,
 {
     let mut envs = envs.unwrap_or_default();
-    envs.insert(
-        "GIT_SSH_COMMAND".into(),
-        resolve_git_ssh_command(&harness_env, &envs),
-    );
+    ensure_git_ssh_is_configured(&harness_env, &mut envs);
 
     let cwd = match harness_env {
         HarnessEnv::Repo(p) | HarnessEnv::Global(p) => p,
@@ -310,24 +306,50 @@ where
         .map_err(Error::<E>::Exec)
 }
 
-fn resolve_git_ssh_command<P>(harness_env: &HarnessEnv<P>, envs: &HashMap<String, String>) -> String
+/// Ensures that the SSH command for Git is configured via one of GIT_SSH one GIT_SSH_COMMAND in
+/// `envs`, or core.sshCommand in the Git-config. `envs` may be mutated as part of this.
+///
+/// Resolution order is `envs` -> environment variables -> Git config.
+///
+/// If no configuration is encountered in any of these locations, we add our own default
+/// configuration for `ssh` to GIT_SSH_COMMAND. This should be the case hit by the vast majority of
+/// users, and it is tuned for what we believe is a good balance between security and convenience.
+///
+/// Note that we never add any options to existing configuration. If the user has made explicit
+/// choices about how SSH should behave, we respect those choices.
+fn ensure_git_ssh_is_configured<P>(harness_env: &HarnessEnv<P>, envs: &mut HashMap<String, String>)
 where
     P: AsRef<Path>,
 {
-    let base_ssh_command = match envs
-        .get("GIT_SSH_COMMAND")
-        .cloned()
-        .or_else(|| envs.get("GIT_SSH").cloned())
-        .or_else(|| std::env::var("GIT_SSH_COMMAND").ok())
-        .or_else(|| std::env::var("GIT_SSH").ok())
-    {
-        Some(v) => v,
-        None => get_core_sshcommand(harness_env)
-            .ok()
-            .flatten()
-            .unwrap_or_else(|| "ssh".into()),
-    };
+    if envs.get("GIT_SSH").is_some() || envs.get("GIT_SSH_COMMAND").is_some() {
+        return;
+    }
 
+    // Note: GIT_SSH_COMMAND takes precedence over GIT_SSH so there is no reason to try to resolve
+    // both.
+    //
+    // Minor correctness issue: Neither GIT_SSH_COMMAND nor GIT_SSH are required to be unicode.
+    // It's entirely possible to have non-unicode byte sequences in paths, for example. This should
+    // be rewritten to use `std::env::var_os()` and the executor should be tweaked to let `envs`
+    // contain raw binary strings. This is however exceedingly unlikely to be a problem in practice
+    // so we'll keep it like this for now.
+    if let Ok(git_ssh_command) = std::env::var("GIT_SSH_COMMAND") {
+        envs.insert("GIT_SSH_COMMAND".into(), git_ssh_command);
+        return;
+    }
+
+    if let Ok(git_ssh) = std::env::var("GIT_SSH") {
+        envs.insert("GIT_SSH".into(), git_ssh);
+        return;
+    }
+
+    if get_core_sshcommand(harness_env).ok().is_some() {
+        // If there is an SSH command configured in Git config, we don't want to override it with
+        // environment variables. Git will pick up on it automatically.
+        return;
+    }
+
+    // There is nothing preconfigured - we apply our own defaults.
     let additional_options = {
         // In test environments, we don't want to pollute the user's known hosts file.
         // So, we just use /dev/null instead.
@@ -341,9 +363,10 @@ where
         }
     };
 
-    format!(
-        "{base_ssh_command} -o StrictHostKeyChecking=accept-new -o KbdInteractiveAuthentication=no{additional_options}"
-    )
+    let git_ssh_command = format!(
+        "ssh -o StrictHostKeyChecking=accept-new -o KbdInteractiveAuthentication=no{additional_options}"
+    );
+    envs.insert("GIT_SSH_COMMAND".into(), git_ssh_command);
 }
 
 fn get_core_sshcommand<P>(harness_env: &HarnessEnv<P>) -> anyhow::Result<Option<String>>
