@@ -1,3 +1,4 @@
+import uiStyles from "#ui/ui.module.css";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link, Outlet, useMatch, useNavigate } from "@tanstack/react-router";
 import { FC, useState } from "react";
@@ -38,6 +39,7 @@ const ProjectSelect: FC = () => {
 				});
 				window.localStorage.setItem(lastOpenedProjectKey, nextProjectId);
 			}}
+			className={uiStyles.button}
 		>
 			<option value="" disabled>
 				Select a project
