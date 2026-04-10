@@ -138,7 +138,11 @@ export class OutsideLaneDzHandler implements DropzoneHandler {
 					.flatMap((c) =>
 						this.uncommittedService.getAssignmentsByPath(data.stackId ?? null, c.path),
 					)
-					.map((h) => ({ ...h, stackId: ensureValue(stack.id) }));
+					.map((h) => ({
+						hunkHeader: h.hunkHeader,
+						pathBytes: h.pathBytes,
+						target: { type: "stack" as const, subject: { stack_id: ensureValue(stack.id) } },
+					}));
 				await this.diffService.assignHunk({
 					projectId: this.projectId,
 					assignments,
@@ -206,7 +210,13 @@ export class OutsideLaneDzHandler implements DropzoneHandler {
 
 				await this.diffService.assignHunk({
 					projectId: this.projectId,
-					assignments: [{ ...assignment, stackId: ensureValue(stack.id) }],
+					assignments: [
+						{
+							hunkHeader: assignment.hunkHeader,
+							pathBytes: assignment.pathBytes,
+							target: { type: "stack" as const, subject: { stack_id: ensureValue(stack.id) } },
+						},
+					],
 				});
 				break;
 			}

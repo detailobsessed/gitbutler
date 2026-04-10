@@ -5,7 +5,7 @@ use but_api::commit::types::{
 };
 use but_core::{DiffSpec, ref_metadata::StackId, sync::RepoExclusive};
 use but_ctx::Context;
-use but_hunk_assignment::HunkAssignmentRequest;
+use but_hunk_assignment::{HunkAssignmentRequest, HunkAssignmentTarget};
 use but_rebase::graph_rebase::mutate::{InsertSide, RelativeTo};
 use colored::Colorize;
 mod amend;
@@ -1537,8 +1537,7 @@ fn assignment_requests_for_selected_hunks<'a>(
         .map(|assignment| HunkAssignmentRequest {
             hunk_header: assignment.hunk_header,
             path_bytes: assignment.path_bytes.to_owned(),
-            stack_id: target_stack_id,
-            branch_ref_bytes: None,
+            target: target_stack_id.map(|sid| HunkAssignmentTarget::Stack { stack_id: sid }),
         })
         .collect()
 }
@@ -1568,8 +1567,7 @@ fn reassign_all_from_stack_to_stack(
         .map(|assignment| HunkAssignmentRequest {
             hunk_header: assignment.hunk_header,
             path_bytes: assignment.path_bytes,
-            stack_id: target_stack_id,
-            branch_ref_bytes: None,
+            target: target_stack_id.map(|sid| HunkAssignmentTarget::Stack { stack_id: sid }),
         })
         .collect::<Vec<_>>();
 

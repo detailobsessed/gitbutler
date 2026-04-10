@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::Path, str::FromStr};
 use anyhow::{Context as _, Result};
 use but_action::{ActionHandler, Source, rename_branch::RenameBranchParams, reword::CommitEvent};
 use but_ctx::{Context, access::RepoExclusive};
-use but_hunk_assignment::HunkAssignmentRequest;
+use but_hunk_assignment::{HunkAssignmentRequest, HunkAssignmentTarget};
 use but_llm::LLMProvider;
 use but_workspace::{
     legacy::{StacksFilter, ui::StackEntry},
@@ -475,8 +475,7 @@ pub fn assign_hunks_post_tool_call(
         .map(|a| HunkAssignmentRequest {
             hunk_header: a.hunk_header,
             path_bytes: a.path_bytes,
-            stack_id: Some(stack_id),
-            branch_ref_bytes: a.branch_ref_bytes,
+            target: Some(HunkAssignmentTarget::Stack { stack_id }),
         })
         .collect();
 

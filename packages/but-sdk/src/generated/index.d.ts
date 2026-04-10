@@ -955,9 +955,10 @@ export type HunkAssignment = {
    */
   stackId: string | null;
   /**
-   * The branch within the stack, as a full ref name (e.g. `refs/heads/my-branch`).
+   * The branch to which the hunk is assigned, as a full ref name (e.g. `refs/heads/my-branch`).
+   * This is the source of truth for assignment targeting. `stack_id` is derived from this field.
    * Serialized as bytes over the wire for non-UTF-8 safety.
-   * `None` means "topmost branch of the stack" (backward-compatible default).
+   * `None` means the hunk is unassigned.
    */
   branchRefBytes: Array<number> | null;
   /** The line numbers that were added in this hunk. */
@@ -968,7 +969,7 @@ export type HunkAssignment = {
 
 /**
  * A request to update a hunk assignment.
- * If a a file has multiple hunks, the UI client should send a list of assignment requests with the appropriate hunk headers.
+ * If a file has multiple hunks, the UI client should send a list of assignment requests with the appropriate hunk headers.
  */
 export type HunkAssignmentRequest = {
   /**
@@ -979,19 +980,21 @@ export type HunkAssignmentRequest = {
   hunkHeader?: HunkHeader | null;
   /** The file path of the hunk in bytes. */
   pathBytes: Array<number>;
-  /**
-   * Deprecated: use `branch_ref_bytes` instead.
-   * Kept for backward compatibility with clients that haven't migrated yet.
-   * If `branch_ref_bytes` is also set, it takes precedence.
-   */
-  stackId: string | null;
-  /**
-   * The branch to which the hunk is assigned, as a full ref name.
-   * Serialized as bytes over the wire for non-UTF-8 safety.
-   * Takes precedence over `stack_id` when both are provided.
-   * If neither is provided, the hunk is unassigned.
-   */
-  branchRefBytes: Array<number> | null;
+  /** Where to assign this hunk. `None` means unassign. */
+  target?: HunkAssignmentTarget | null;
+};
+
+/** The target for a hunk assignment: either a specific branch or a stack (resolved to its topmost branch). */
+export type HunkAssignmentTarget = {
+  type: "stack";
+  subject: {
+    stack_id: string;
+  };
+} | {
+  type: "branch";
+  subject: {
+    branch_ref_bytes: Array<number>;
+  };
 };
 
 /**

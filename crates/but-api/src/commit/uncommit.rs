@@ -91,8 +91,7 @@ pub fn commit_uncommit_changes_only_with_perm(
             .map(|assignment| HunkAssignmentRequest {
                 hunk_header: assignment.hunk_header,
                 path_bytes: assignment.path_bytes,
-                stack_id: Some(stack_id),
-                branch_ref_bytes: assignment.branch_ref_bytes,
+                target: Some(but_hunk_assignment::HunkAssignmentTarget::Stack { stack_id }),
             })
             .collect();
 

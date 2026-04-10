@@ -265,8 +265,10 @@ export const getCombineOperation = ({
 													(hunkHeader): HunkAssignmentRequest => ({
 														pathBytes: change.pathBytes,
 														hunkHeader,
-														stackId: targetStackId,
-														branchRefBytes: null,
+														target:
+															targetStackId !== null
+																? { type: "stack" as const, subject: { stack_id: targetStackId } }
+																: null,
 													}),
 												),
 											),

@@ -152,8 +152,7 @@ export const getInsertionSide = (operation: Operation): InsertSide | null =>
 export const operationLabel = (operation: Operation): string =>
 	Match.value(operation).pipe(
 		Match.tagsExhaustive({
-			AssignHunk: (operation) =>
-				operation.assignments[0]?.stackId == null ? "Unassign" : "Assign",
+			AssignHunk: (operation) => (operation.assignments[0]?.target == null ? "Unassign" : "Assign"),
 			CommitAmend: () => "Amend",
 			CommitCreate: ({ side }) =>
 				Match.value(side).pipe(

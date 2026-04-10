@@ -189,8 +189,9 @@ async fn main() -> Result<()> {
         } => {
             let assignment = but_hunk_assignment::HunkAssignmentRequest {
                 path_bytes: BString::from_str(path)?,
-                stack_id: Some(*stack_id),
-                branch_ref_bytes: None,
+                target: Some(but_hunk_assignment::HunkAssignmentTarget::Stack {
+                    stack_id: *stack_id,
+                }),
                 hunk_header: Some(HunkHeader {
                     old_start: *old_start,
                     old_lines: *old_lines,

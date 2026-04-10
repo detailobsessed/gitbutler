@@ -6,6 +6,7 @@ import {
 } from "$lib/dragging/draggables";
 import { type DiffService } from "$lib/hunks/diffService.svelte";
 import type { DropzoneHandler } from "$lib/dragging/handler";
+import type { HunkAssignmentTarget } from "$lib/hunks/hunk";
 import type { FileSelectionManager } from "$lib/selection/fileSelectionManager.svelte";
 import type { UncommittedService } from "$lib/selection/uncommittedService.svelte";
 
@@ -33,6 +34,12 @@ export class AssignmentDropHandler implements DropzoneHandler {
 		return false;
 	}
 
+	private get assignmentTarget(): HunkAssignmentTarget | null {
+		const id = this.stackId;
+		if (id === undefined) return null;
+		return { type: "stack", subject: { stack_id: id } };
+	}
+
 	async ondrop(data: ChangeDropData | HunkDropDataV3) {
 		if (data.stackId === this.stackId) return;
 		if (data instanceof FileChangeDropData) {
@@ -40,7 +47,11 @@ export class AssignmentDropHandler implements DropzoneHandler {
 			const changes = await data.treeChanges();
 			const assignments = changes
 				.flatMap((c) => this.uncommittedService.getAssignmentsByPath(data.stackId || null, c.path))
-				.map((h) => ({ ...h, stackId: this.stackId || null }));
+				.map((h) => ({
+					hunkHeader: h.hunkHeader,
+					pathBytes: h.pathBytes,
+					target: this.assignmentTarget,
+				}));
 			await this.diffService.assignHunk({
 				projectId: this.projectId,
 				assignments,
@@ -56,7 +67,11 @@ export class AssignmentDropHandler implements DropzoneHandler {
 			const changes = await data.treeChanges();
 			const assignments = changes
 				.flatMap((c) => this.uncommittedService.getAssignmentsByPath(data.stackId || null, c.path))
-				.map((h) => ({ ...h, stackId: this.stackId || null }));
+				.map((h) => ({
+					hunkHeader: h.hunkHeader,
+					pathBytes: h.pathBytes,
+					target: this.assignmentTarget,
+				}));
 			await this.diffService.assignHunk({
 				projectId: this.projectId,
 				assignments,
@@ -79,7 +94,15 @@ export class AssignmentDropHandler implements DropzoneHandler {
 			);
 			await this.diffService.assignHunk({
 				projectId: this.projectId,
-				assignments: [{ ...assignment, stackId: this.stackId || null }],
+				assignments: [
+					{
+						hunkHeader: assignment.hunkHeader,
+						pathBytes: assignment.pathBytes,
+						target: this.stackId
+							? { type: "stack" as const, subject: { stack_id: this.stackId } }
+							: null,
+					},
+				],
 			});
 
 			// If we just moved the last assignment, remove the file from the selection.

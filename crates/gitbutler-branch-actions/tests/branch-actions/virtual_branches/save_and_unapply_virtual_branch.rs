@@ -43,8 +43,9 @@ fn unapply_with_data() -> anyhow::Result<()> {
     let req = HunkAssignmentRequest {
         hunk_header: assignments[0].hunk_header,
         path_bytes: assignments[0].path_bytes.clone(),
-        stack_id: Some(stacks[0].0),
-        branch_ref_bytes: assignments[0].branch_ref_bytes.clone(),
+        target: Some(but_hunk_assignment::HunkAssignmentTarget::Stack {
+            stack_id: stacks[0].0,
+        }),
     };
     but_hunk_assignment::assign(
         db.hunk_assignments_mut()?,

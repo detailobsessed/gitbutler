@@ -59,9 +59,10 @@ export type HunkAssignment = {
 	 */
 	stackId: string | null;
 	/**
-	 * The branch within the stack, as a full ref name (e.g. `refs/heads/my-branch`).
+	 * The branch to which the hunk is assigned, as a full ref name (e.g. `refs/heads/my-branch`).
+	 * This is the source of truth for assignment targeting. `stack_id` is derived from this field.
 	 * Serialized as bytes over the wire for non-UTF-8 safety.
-	 * `None` means "topmost branch of the stack" (backward-compatible default).
+	 * `None` means the hunk is unassigned.
 	 */
 	branchRefBytes: number[] | null;
 	/**
@@ -73,3 +74,10 @@ export type HunkAssignment = {
 	 */
 	lineNumsRemoved: Array<number> | null;
 };
+
+/**
+ * The target for a hunk assignment: either a specific branch or a stack (resolved to its topmost branch).
+ */
+export type HunkAssignmentTarget =
+	| { type: "stack"; subject: { stack_id: string } }
+	| { type: "branch"; subject: { branch_ref_bytes: number[] } };

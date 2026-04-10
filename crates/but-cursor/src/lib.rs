@@ -199,8 +199,7 @@ pub async fn handle_after_edit(read: impl std::io::Read) -> anyhow::Result<Curso
         .map(|a| HunkAssignmentRequest {
             hunk_header: a.hunk_header,
             path_bytes: a.path_bytes,
-            stack_id: Some(stack_id),
-            branch_ref_bytes: a.branch_ref_bytes,
+            target: Some(but_hunk_assignment::HunkAssignmentTarget::Stack { stack_id }),
         })
         .collect();
 

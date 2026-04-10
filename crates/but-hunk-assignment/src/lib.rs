@@ -288,16 +288,40 @@ pub struct JsonAbsorbOutput {
     pub commits: Vec<JsonCommitAbsorption>,
 }
 
+/// The target for a hunk assignment: either a specific branch or a stack (resolved to its topmost branch).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "export-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "export-ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", tag = "type", content = "subject")]
+#[cfg_attr(
+    feature = "export-ts",
+    ts(export, export_to = "./hunkAssignment/index.ts")
+)]
+pub enum HunkAssignmentTarget {
+    /// Assign to a stack's topmost branch. Legacy — prefer `Branch`.
+    Stack {
+        #[cfg_attr(feature = "export-ts", ts(type = "string"))]
+        #[cfg_attr(feature = "export-schema", schemars(with = "String"))]
+        stack_id: StackId,
+    },
+    /// Assign to a specific branch by its full ref name (as bytes).
+    Branch {
+        #[cfg_attr(feature = "export-ts", ts(type = "number[]"))]
+        #[cfg_attr(
+            feature = "export-schema",
+            schemars(schema_with = "but_schemars::bstring_bytes")
+        )]
+        branch_ref_bytes: BString,
+    },
+}
+#[cfg(feature = "export-schema")]
+but_schemars::register_sdk_type!(HunkAssignmentTarget);
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[cfg_attr(feature = "export-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
 /// A request to update a hunk assignment.
 /// If a file has multiple hunks, the UI client should send a list of assignment requests with the appropriate hunk headers.
-///
-/// The assignment target is determined by `branch_ref_bytes` (preferred) or `stack_id` (legacy fallback).
-/// When `branch_ref_bytes` is set, it takes precedence over `stack_id`.
-/// When only `stack_id` is provided, it is resolved to the stack's topmost branch.
-/// When neither is provided, the hunk is unassigned.
 pub struct HunkAssignmentRequest {
     /// The hunk that is being assigned. Together with path_bytes, this identifies the hunk.
     /// If the file is binary, or too large to load, this will be None and in this case the path name is the only identity.
@@ -309,24 +333,8 @@ pub struct HunkAssignmentRequest {
         schemars(schema_with = "but_schemars::bstring_bytes")
     )]
     pub path_bytes: BString,
-    /// Deprecated: use `branch_ref_bytes` instead.
-    /// Kept for backward compatibility with clients that haven't migrated yet.
-    /// If `branch_ref_bytes` is also set, it takes precedence.
-    #[cfg_attr(
-        feature = "export-schema",
-        schemars(schema_with = "but_schemars::stack_id_opt")
-    )]
-    pub stack_id: Option<StackId>,
-    /// The branch to which the hunk is assigned, as a full ref name.
-    /// Serialized as bytes over the wire for non-UTF-8 safety.
-    /// Takes precedence over `stack_id` when both are provided.
-    /// If neither is provided, the hunk is unassigned.
-    #[serde(with = "but_serde::fullname_bytes_opt")]
-    #[cfg_attr(
-        feature = "export-schema",
-        schemars(schema_with = "but_schemars::fullname_bytes_opt")
-    )]
-    pub branch_ref_bytes: Option<gix::refs::FullName>,
+    /// Where to assign this hunk. `None` means unassign.
+    pub target: Option<HunkAssignmentTarget>,
 }
 #[cfg(feature = "export-schema")]
 but_schemars::register_sdk_type!(HunkAssignmentRequest);
@@ -737,15 +745,22 @@ fn requests_to_assignments(
 ) -> Vec<HunkAssignment> {
     let mut assignments = vec![];
     for req in request {
-        // branch_ref_bytes takes precedence; fall back to resolving stack_id → topmost branch
-        let branch_ref_bytes = req.branch_ref_bytes.or_else(|| {
-            req.stack_id.and_then(|sid| {
-                workspace
-                    .find_stack_by_id(sid)
-                    .and_then(|stack| stack.ref_name())
-                    .map(|r| r.to_owned())
-            })
-        });
+        let branch_ref_bytes = match req.target {
+            None => None,
+            Some(HunkAssignmentTarget::Branch { branch_ref_bytes }) => {
+                match gix::refs::FullName::try_from(branch_ref_bytes) {
+                    Ok(name) => Some(name),
+                    Err(err) => {
+                        tracing::warn!("Invalid branch_ref_bytes in assignment request: {err}");
+                        None
+                    }
+                }
+            }
+            Some(HunkAssignmentTarget::Stack { stack_id }) => workspace
+                .find_stack_by_id(stack_id)
+                .and_then(|stack| stack.ref_name())
+                .map(|r| r.to_owned()),
+        };
         let assignment = HunkAssignment {
             id: None,
             hunk_header: req.hunk_header,
@@ -765,11 +780,22 @@ fn requests_to_assignments(
 pub fn assignments_to_requests(assignments: Vec<HunkAssignment>) -> Vec<HunkAssignmentRequest> {
     assignments
         .into_iter()
-        .map(|assignment| HunkAssignmentRequest {
-            hunk_header: assignment.hunk_header,
-            path_bytes: assignment.path_bytes,
-            stack_id: assignment.stack_id,
-            branch_ref_bytes: assignment.branch_ref_bytes,
+        .map(|assignment| {
+            let target = assignment
+                .branch_ref_bytes
+                .map(|r| HunkAssignmentTarget::Branch {
+                    branch_ref_bytes: BString::from(r.as_bstr()),
+                })
+                .or_else(|| {
+                    assignment
+                        .stack_id
+                        .map(|sid| HunkAssignmentTarget::Stack { stack_id: sid })
+                });
+            HunkAssignmentRequest {
+                hunk_header: assignment.hunk_header,
+                path_bytes: assignment.path_bytes,
+                target,
+            }
         })
         .collect()
 }
@@ -890,8 +916,7 @@ mod tests {
                     new_lines: end,
                 }),
                 path_bytes: BString::from(path),
-                stack_id: None,
-                branch_ref_bytes: None,
+                target: None,
             }
         }
     }
