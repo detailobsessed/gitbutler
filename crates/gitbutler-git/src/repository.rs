@@ -75,7 +75,6 @@ async fn execute_with_auth_harness<P, F, Fut, E>(
     harness_env: HarnessEnv<P>,
     executor: &E,
     args: &[&str],
-    envs: Option<HashMap<String, String>>,
     on_prompt: Option<F>,
 ) -> Result<(usize, String, String), Error<E>>
 where
@@ -84,6 +83,9 @@ where
     F: FnMut(String) -> Fut,
     Fut: std::future::Future<Output = Option<String>>,
 {
+    let mut envs = HashMap::new();
+    ensure_git_ssh_is_configured(&harness_env, &mut envs);
+
     if let Some(on_prompt) = on_prompt {
         execute_with_indirect_askpass(harness_env, executor, args, envs, on_prompt).await
     } else {
@@ -92,12 +94,12 @@ where
 }
 
 /// Askpass-aware execution of Git commands, allowing the GUI to communicate with the askpass
-/// process over a pipe.
+/// process over a pipe or socket.
 async fn execute_with_indirect_askpass<P, F, Fut, E>(
     harness_env: HarnessEnv<P>,
     executor: &E,
     args: &[&str],
-    envs: Option<HashMap<String, String>>,
+    mut envs: HashMap<String, String>,
     mut on_prompt: F,
 ) -> Result<(usize, String, String), Error<E>>
 where
@@ -170,7 +172,6 @@ where
         .map(char::from)
         .collect::<String>();
 
-    let mut envs = envs.unwrap_or_default();
     envs.insert("GITBUTLER_ASKPASS_PIPE".into(), sock_server.to_string());
     envs.insert("GITBUTLER_ASKPASS_SECRET".into(), secret.clone());
 
@@ -194,8 +195,6 @@ where
     // See the OpenSSH client manual for more info.
     envs.insert("SSH_ASKPASS".into(), askpath_path.display().to_string());
     envs.insert("SSH_ASKPASS_REQUIRE".into(), "force".into());
-
-    ensure_git_ssh_is_configured(&harness_env, &mut envs);
 
     let cwd = match harness_env {
         HarnessEnv::Repo(p) | HarnessEnv::Global(p) => p,
@@ -287,15 +286,12 @@ async fn execute_direct<P, E>(
     harness_env: HarnessEnv<P>,
     executor: &E,
     args: &[&str],
-    envs: Option<HashMap<String, String>>,
+    envs: HashMap<String, String>,
 ) -> Result<(usize, String, String), Error<E>>
 where
     P: AsRef<Path>,
     E: GitExecutor,
 {
-    let mut envs = envs.unwrap_or_default();
-    ensure_git_ssh_is_configured(&harness_env, &mut envs);
-
     let cwd = match harness_env {
         HarnessEnv::Repo(p) | HarnessEnv::Global(p) => p,
     };
@@ -306,25 +302,24 @@ where
         .map_err(Error::<E>::Exec)
 }
 
-/// Ensures that the SSH command for Git is configured via one of GIT_SSH one GIT_SSH_COMMAND in
-/// `envs`, or core.sshCommand in the Git-config. `envs` may be mutated as part of this.
+/// Ensures that the SSH command for Git is configured via one of GIT_SSH or GIT_SSH_COMMAND in
+/// `envs`, or core.sshCommand in the Git-config. `envs` may be modified with the aforementioned
+/// environment variables if they are found in the environment.
 ///
-/// Resolution order is `envs` -> environment variables -> Git config.
+/// Resolution order reflects Git in that we first look for environment variables, and if those are
+/// not found we consider Git config.
 ///
 /// If no configuration is encountered in any of these locations, we add our own default
 /// configuration for `ssh` to GIT_SSH_COMMAND. This should be the case hit by the vast majority of
 /// users, and it is tuned for what we believe is a good balance between security and convenience.
 ///
 /// Note that we never add any options to existing configuration. If the user has made explicit
-/// choices about how SSH should behave, we respect those choices.
+/// choices about how SSH should behave, we respect those choices and leave it to the user to deal
+/// with the consequences.
 fn ensure_git_ssh_is_configured<P>(harness_env: &HarnessEnv<P>, envs: &mut HashMap<String, String>)
 where
     P: AsRef<Path>,
 {
-    if envs.get("GIT_SSH").is_some() || envs.get("GIT_SSH_COMMAND").is_some() {
-        return;
-    }
-
     // Note: GIT_SSH_COMMAND takes precedence over GIT_SSH so there is no reason to try to resolve
     // both.
     //
@@ -411,14 +406,8 @@ where
     args.push(remote);
     args.push(&refspec);
 
-    let (status, stdout, stderr) = execute_with_auth_harness(
-        HarnessEnv::Repo(repo_path),
-        &executor,
-        &args,
-        None,
-        on_prompt,
-    )
-    .await?;
+    let (status, stdout, stderr) =
+        execute_with_auth_harness(HarnessEnv::Repo(repo_path), &executor, &args, on_prompt).await?;
 
     if status == 0 {
         Ok(())
@@ -492,14 +481,8 @@ where
         args.push(opt.as_str());
     }
 
-    let (status, stdout, stderr) = execute_with_auth_harness(
-        HarnessEnv::Repo(repo_path),
-        &executor,
-        &args,
-        None,
-        on_prompt,
-    )
-    .await?;
+    let (status, stdout, stderr) =
+        execute_with_auth_harness(HarnessEnv::Repo(repo_path), &executor, &args, on_prompt).await?;
 
     if status == 0 {
         return Ok(stderr);
@@ -565,14 +548,9 @@ where
     let target_dir_str = target_dir.to_string_lossy();
     let args = vec!["clone", "--", repository_url, &target_dir_str];
 
-    let (status, stdout, stderr) = execute_with_auth_harness(
-        HarnessEnv::Global(work_dir),
-        &executor,
-        &args,
-        None,
-        on_prompt,
-    )
-    .await?;
+    let (status, stdout, stderr) =
+        execute_with_auth_harness(HarnessEnv::Global(work_dir), &executor, &args, on_prompt)
+            .await?;
 
     if status == 0 {
         Ok(())
