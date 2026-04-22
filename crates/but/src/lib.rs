@@ -31,7 +31,7 @@ use clap::Parser;
 
 pub mod args;
 use args::{
-    Args, OutputFormat, Subcommands, actions, alias as alias_args, branch, forge,
+    Args, OutputFormat, Subcommands, actions, alias as alias_args, branch, forge, hook,
     update as update_args, worktree,
 };
 use but_settings::AppSettings;
@@ -448,6 +448,40 @@ async fn match_subcommand(
                 }
             }
         }
+        Subcommands::Hook(hook::Platform { cmd }) => match cmd {
+            hook::Subcommands::PreCommit => {
+                command::hook::pre_commit(out, &args.current_dir).emit_metrics(metrics_ctx)
+            }
+            hook::Subcommands::PostCheckout {
+                prev_head,
+                new_head,
+                is_branch_checkout,
+            } => command::hook::post_checkout(
+                out,
+                &args.current_dir,
+                &prev_head,
+                &new_head,
+                &is_branch_checkout,
+            )
+            .emit_metrics(metrics_ctx),
+            hook::Subcommands::Status => {
+                command::hook::status(out, &args.current_dir).emit_metrics(metrics_ctx)
+            }
+            hook::Subcommands::PrePush {
+                remote_name,
+                remote_url,
+            } => command::hook::pre_push(out, &args.current_dir, &remote_name, &remote_url)
+                .emit_metrics(metrics_ctx),
+            hook::Subcommands::Install { force } => {
+                command::hook::install(out, &args.current_dir, force)
+                    .map(drop)
+                    .emit_metrics(metrics_ctx)
+            }
+            hook::Subcommands::Uninstall => command::hook::uninstall(out, &args.current_dir)
+                .map(drop)
+                .emit_metrics(metrics_ctx),
+        }
+        .map_err(CliError::from),
         Subcommands::Skill(args::skill::Platform { cmd }) => {
             // Skill commands use repository context when available, but can run
             // without one. Subcommand handlers produce tailored guidance when a
@@ -1117,7 +1151,11 @@ async fn match_subcommand(
                 .map_err(CliError::from)
         }
         #[cfg(feature = "legacy")]
-        Subcommands::Setup { init } => {
+        Subcommands::Setup {
+            init,
+            no_hooks,
+            force_hooks,
+        } => {
             let repo =
                 match but_api::legacy::projects::add_project_best_effort(args.current_dir.clone())?
                 {
@@ -1133,10 +1171,17 @@ async fn match_subcommand(
                 };
             let mut ctx = but_ctx::Context::from_repo(repo)?;
             let mut guard = ctx.exclusive_worktree_access();
-            command::legacy::setup::repo(&mut ctx, &args.current_dir, out, guard.write_permission())
-                .context("Failed to set up GitButler project.")
-                .emit_metrics(metrics_ctx)
-                .map_err(CliError::from)
+            command::legacy::setup::repo(
+                &mut ctx,
+                &args.current_dir,
+                out,
+                guard.write_permission(),
+                no_hooks,
+                force_hooks,
+            )
+            .context("Failed to set up GitButler project.")
+            .emit_metrics(metrics_ctx)
+            .map_err(CliError::from)
         }
         #[cfg(feature = "legacy")]
         Subcommands::Teardown { checkout_to } => {
@@ -1148,7 +1193,7 @@ async fn match_subcommand(
                 },
                 out,
             )?;
-            command::legacy::teardown::teardown(&mut ctx, checkout_to, out)
+            command::legacy::teardown::teardown(&mut ctx, checkout_to, out, &args.current_dir)
                 .map_err(|err| err.context("Failed to teardown GitButler project."))
                 .emit_metrics(metrics_ctx)
         }

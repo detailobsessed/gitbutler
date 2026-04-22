@@ -69,6 +69,12 @@ pub enum CommandName {
     Pick,
     Clean,
     External,
+    HookPreCommit,
+    HookPostCheckout,
+    HookStatus,
+    HookPrePush,
+    HookInstall,
+    HookUninstall,
     #[default]
     Unknown,
 }

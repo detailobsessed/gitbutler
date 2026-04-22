@@ -38,6 +38,16 @@ Use the panic backtrace to find the nested guard acquisition, then thread the
 existing permission to that call site or switch it to an existing
 permission-taking helper.
 
+## Hook Subcommands
+
+`but hook` subcommands (`pre-commit`, `post-checkout`, `pre-push`, `status`) are
+the exception to the rule that commands take the repository as an input via
+`ctx.repo.get()?`. They run as standalone hook subprocesses with no `Context`,
+so they discover the repository themselves with
+`gix::discover_with_environment_overrides()` — honouring `GIT_DIR`/`GIT_WORK_TREE`
+when Git invokes them, and falling back to a directory walk when an external
+manager such as prek invokes them directly.
+
 ## CLI Tests
 
 - In `crates/but/tests/`, prefer `env.but(...).assert().success()/failure()`

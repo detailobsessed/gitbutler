@@ -135,6 +135,7 @@ pub fn print_grouped(out: &mut dyn std::fmt::Write) -> std::fmt::Result {
                 SubcommandDiscriminant::Config => Group::OtherCommands,
                 SubcommandDiscriminant::Skill => Group::OtherCommands,
                 SubcommandDiscriminant::Help => Group::OtherCommands,
+                SubcommandDiscriminant::Hook => Group::OtherCommands,
 
                 #[cfg(feature = "legacy")]
                 SubcommandDiscriminant::Setup => Group::OtherCommands,
@@ -348,6 +349,7 @@ Other Commands:
   alias        Manage command aliases.
   config       View and manage GitButler configuration.
   skill        Manage AI agent skills for GitButler.
+  hook         Git hook commands for use with external hook managers.
 
 To add command completion, add this to your shell rc: (for example ~/.zshrc)
   eval "$(but completions zsh)"
