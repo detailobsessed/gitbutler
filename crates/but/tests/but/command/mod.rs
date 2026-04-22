@@ -23,6 +23,15 @@ mod discard;
 mod format;
 mod gui;
 mod help;
+mod hook;
+mod hook_install;
+#[cfg(feature = "legacy")]
+mod hook_lifecycle;
+#[cfg(feature = "legacy")]
+mod hook_prek_integration;
+#[cfg(feature = "legacy")]
+mod hook_status;
+mod hook_uninstall;
 #[cfg(feature = "legacy")]
 mod merge;
 #[cfg(feature = "legacy")]

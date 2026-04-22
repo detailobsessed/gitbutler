@@ -12,6 +12,8 @@ use crate::{
     utils::OutputChannel,
 };
 
+use crate::command::hook::{HookInfo, HookManagerInfo};
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SetupResult {
@@ -21,6 +23,10 @@ struct SetupResult {
     project_status: ProjectStatus,
     /// The target branch configuration
     target: Option<TargetInfo>,
+    /// Information about an external hook manager, if one was detected
+    hook_manager: Option<HookManagerInfo>,
+    /// Details about installed hooks
+    hooks: Vec<HookInfo>,
 }
 
 #[derive(Debug, Serialize)]
@@ -70,31 +76,31 @@ fn display_splash_screen(out: &mut dyn std::fmt::Write) -> anyhow::Result<()> {
 
     writeln!(
         out,
-        "{:<45} {}",
+        "{:<26} {}",
         t.command_suggestion.paint("$ but branch new <name>"),
         t.hint.paint("Create a new branch")
     )?;
     writeln!(
         out,
-        "{:<45} {}",
+        "{:<26} {}",
         t.command_suggestion.paint("$ but status"),
         t.hint.paint("View workspace status")
     )?;
     writeln!(
         out,
-        "{:<45} {}",
+        "{:<26} {}",
         t.command_suggestion.paint("$ but commit -m <message>"),
         t.hint.paint("Commit changes to current branch")
     )?;
     writeln!(
         out,
-        "{:<45} {}",
+        "{:<26} {}",
         t.command_suggestion.paint("$ but push"),
         t.hint.paint("Push all branches")
     )?;
     writeln!(
         out,
-        "{:<45} {}",
+        "{:<26} {}",
         t.command_suggestion.paint("$ but teardown"),
         t.hint.paint("Return to normal Git mode")
     )?;
@@ -175,6 +181,8 @@ pub(crate) fn repo(
     repo_path: &Path,
     out: &mut OutputChannel,
     perm: &mut RepoExclusive,
+    no_hooks: bool,
+    force_hooks: bool,
 ) -> anyhow::Result<()> {
     let t = theme::get();
     let mut target_info: Option<TargetInfo> = None;
@@ -258,6 +266,16 @@ pub(crate) fn repo(
             repo_path.display()
         )),
     }?;
+
+    {
+        let repo = ctx.repo.get()?;
+        if no_hooks {
+            but_hooks::managed_hooks::set_install_managed_hooks_enabled(&repo, false)?;
+        }
+        // NOTE: --force-hooks config persistence is deferred to the hook section
+        // below, because switch_back_to_workspace_with_perm() may call
+        // ensure_managed_hooks(force=false) which would overwrite it.
+    }
 
     // Check if target branch is set
     let target = but_api::legacy::virtual_branches::get_base_branch_data(ctx)?;
@@ -389,7 +407,7 @@ pub(crate) fn repo(
             }
             writeln!(out)?;
         }
-    }
+    };
 
     let head_name = {
         let repo = ctx.repo.get()?;
@@ -404,24 +422,53 @@ pub(crate) fn repo(
         but_api::legacy::virtual_branches::switch_back_to_workspace_with_perm(ctx, perm)?;
     }
 
-    // Install managed hooks to prevent accidental git commits
-    if let Ok(repo) = ctx.repo.get()
-        && let Err(e) = gitbutler_repo::managed_hooks::install_managed_hooks(&repo)
-        && let Some(out) = out.for_human()
-    {
-        writeln!(
-            out,
-            "  {}",
-            t.attention.paint(format!(
-                "Warning: Failed to install GitButler managed hooks: {e}"
-            ))
-        )?;
-    }
+    // Install managed hooks to prevent accidental git commits.
+    //
+    // --no-hooks is a setup-time bypass: persist the opt-out, then call the
+    // universal `but hook uninstall` to clean up any prior managed hooks.
+    // Otherwise delegate to `but hook install`, which handles external-
+    // manager detection, config persistence (on --force), the orphaned-
+    // hooks sweep, and JSON output.
+    let report = if no_hooks {
+        if let Some(out) = out.for_human() {
+            writeln!(
+                out,
+                "  {}",
+                t.hint.paint("Skipping hook installation (--no-hooks)")
+            )?;
+        }
+        let repo = ctx.repo.get()?;
+        but_hooks::managed_hooks::set_install_managed_hooks_enabled(&repo, false)?;
+        let u = crate::command::hook::uninstall_internal(out, repo_path)?;
+        crate::command::hook::HookInstallReport {
+            warnings: u.warnings,
+            ..Default::default()
+        }
+    } else {
+        if force_hooks && let Some(out) = out.for_human() {
+            writeln!(
+                out,
+                "  {}",
+                t.hint
+                    .paint("Forcing hook installation (--force-hooks), skipping detection.")
+            )?;
+        }
+        crate::command::hook::install_internal(out, repo_path, force_hooks)?
+    };
+
+    let hooks_installed = report.hooks_installed;
+    let hook_info_json = report.hooks;
+    let hook_manager_info = report.hook_manager;
 
     // if we switched - tell the user what this is all about
     if pre_head_name != "gitbutler/workspace"
         && let Some(out) = out.for_human()
     {
+        let hooks_note = if hooks_installed {
+            "\n- Installing Git hooks to help manage commits on the workspace branch"
+        } else {
+            ""
+        };
         writeln!(
             out,
             "{}",
@@ -429,8 +476,7 @@ pub(crate) fn repo(
                 r#"
 Setting up your project for GitButler tooling. Some things to note:
 
-- Switching you to a special `gitbutler/workspace` branch to enable parallel branches
-- Installing Git hooks to help manage commits on the workspace branch
+- Switching you to a special `gitbutler/workspace` branch to enable parallel branches{hooks_note}
 
 To undo these changes and return to normal Git mode, either:
 
@@ -454,6 +500,8 @@ More info: https://docs.gitbutler.com/workspace-branch
             repository_path: path::absolute(repo_path)?.display().to_string(),
             project_status,
             target: target_info,
+            hook_manager: hook_manager_info,
+            hooks: hook_info_json,
         };
         json_out.write_value(&result)?;
     }

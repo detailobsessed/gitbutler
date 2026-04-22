@@ -821,6 +821,7 @@ dependencies = [
  "but-github",
  "but-gitlab",
  "but-graph",
+ "but-hooks",
  "but-hunk-assignment",
  "but-installer",
  "but-llm",
@@ -1331,6 +1332,19 @@ dependencies = [
  "itertools",
  "petgraph",
  "tracing",
+]
+
+[[package]]
+name = "but-hooks"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "but-core",
+ "gix",
+ "temp-env",
+ "tempfile",
+ "tracing",
+ "which",
 ]
 
 [[package]]
@@ -4155,6 +4169,7 @@ dependencies = [
  "but-core",
  "but-ctx",
  "but-gerrit",
+ "but-hooks",
  "but-oxidize",
  "but-settings",
  "but-testsupport",
