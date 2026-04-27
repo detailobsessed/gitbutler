@@ -26,7 +26,10 @@ pub(crate) fn squash_commits(
     perm: &mut RepoExclusive,
 ) -> Result<gix::ObjectId> {
     // create a snapshot
-    let snap = ctx.create_snapshot(SnapshotDetails::new(OperationKind::SquashCommit), perm)?;
+    let snap = ctx.create_snapshot(
+        SnapshotDetails::new(OperationKind::SquashCommit).with_count(source_ids.len()),
+        perm,
+    )?;
     let result = do_squash_commits(ctx, stack_id, source_ids, desitnation_id, perm);
     // if result is error, restore from snapshot
     if result.is_err() {

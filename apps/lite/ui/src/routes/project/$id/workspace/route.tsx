@@ -20,12 +20,15 @@ import { classes } from "#ui/classes.ts";
 import { DependencyIcon, ExpandCollapseIcon, MenuTriggerIcon, PushIcon } from "#ui/icons.tsx";
 import { changeFileParent, commitFileParent, type FileParent } from "#ui/domain/FileParent.ts";
 import { getBranchNameByCommitId, getCommonBaseCommitId } from "#ui/domain/RefInfo.ts";
-import { ProjectPreviewLayout } from "#ui/routes/project/$id/ProjectPreviewLayout.tsx";
+import {
+	ProjectPreviewLayout,
+	useFocusedProjectPanel,
+	useProjectPanelFocusManager,
+} from "#ui/routes/project/$id/ProjectPreviewLayout.tsx";
 import {
 	projectActions,
 	selectProjectExpandedCommitId,
 	selectProjectHighlightedCommitIds,
-	selectProjectLayoutState,
 	selectProjectOperationModeState,
 	selectProjectSelectedItem,
 	selectProjectWorkspaceModeState,
@@ -41,6 +44,7 @@ import {
 	decodeRefName,
 	encodeRefName,
 	assert,
+	commitTitle,
 } from "#ui/routes/project/$id/shared.tsx";
 import {
 	type NativeMenuItem,
@@ -49,6 +53,7 @@ import {
 } from "#ui/native-menu.ts";
 import uiStyles from "#ui/ui.module.css";
 import { Tooltip, useRender } from "@base-ui/react";
+import { Toolbar } from "@base-ui/react/toolbar";
 import { useMergedRefs } from "@base-ui/utils/useMergedRefs";
 import {
 	AbsorptionTarget,
@@ -96,6 +101,7 @@ import {
 	type CommitItem,
 	commitItem,
 	itemEquals,
+	itemIdentityKey,
 	type Item,
 	stackItem,
 	hunkItem,
@@ -124,6 +130,7 @@ import {
 	isValidWorkspaceMode,
 	type WorkspaceMode,
 } from "./WorkspaceMode.ts";
+import { Panel } from "#ui/routes/project/$id/state/layout.ts";
 
 type HunkDependencyDiff = HunkDependencies["diffs"][number];
 
@@ -160,6 +167,9 @@ const useIsItemSelected = ({
 
 		return selectedItem !== null && itemEquals(selectedItem, item);
 	});
+
+const treeItemId = (projectId: string, item: Item): string =>
+	`project-${encodeURIComponent(projectId)}-treeitem-${encodeURIComponent(itemIdentityKey(item))}`;
 
 const lineEndingForDiff = (diff: string): string => (diff.includes("\r\n") ? "\r\n" : "\n");
 
@@ -201,22 +211,17 @@ const HunkDiff: FC<{
 const hunkKey = (hunk: HunkHeader): string =>
 	`${hunk.oldStart}:${hunk.oldLines}:${hunk.newStart}:${hunk.newLines}`;
 
-const FileButton: FC<
-	{
-		change: TreeChange;
-	} & ComponentProps<"button">
-> = ({ change, className, ...restProps }) => (
-	<button {...restProps} type="button" className={classes(className, styles.itemRowButton)}>
-		{Match.value(change.status).pipe(
-			Match.when({ type: "Addition" }, () => "A"),
-			Match.when({ type: "Deletion" }, () => "D"),
-			Match.when({ type: "Modification" }, () => "M"),
-			Match.when({ type: "Rename" }, () => "R"),
-			Match.exhaustive,
-		)}{" "}
-		{change.path}
-	</button>
-);
+const fileRowLabel = (change: TreeChange) => {
+	const status = Match.value(change.status).pipe(
+		Match.when({ type: "Addition" }, () => "A"),
+		Match.when({ type: "Deletion" }, () => "D"),
+		Match.when({ type: "Modification" }, () => "M"),
+		Match.when({ type: "Rename" }, () => "R"),
+		Match.exhaustive,
+	);
+
+	return `${status} ${change.path}`;
+};
 
 const CommitFiles: FC<{
 	projectId: string;
@@ -254,17 +259,17 @@ const CommitFiles: FC<{
 			)}
 
 			{data.changes.length > 0 && (
-				<ul>
+				<div role="group">
 					{data.changes.map((file) => (
-						<li key={file.path}>{renderFile(file)}</li>
+						<Fragment key={file.path}>{renderFile(file)}</Fragment>
 					))}
-				</ul>
+				</div>
 			)}
 		</>
 	);
 };
 
-const ItemRow: FC<
+const ItemRowPresentational: FC<
 	{
 		isSelected?: boolean;
 	} & ComponentProps<"div">
@@ -289,12 +294,37 @@ const ItemRow: FC<
 	);
 };
 
-const DependencyIndicatorButton: FC<{
-	projectId: string;
-	commitIds: NonEmptyArray<string>;
-	className?: string;
-	children: ReactNode;
-}> = ({ projectId, commitIds, className, children }) => {
+const ItemRow: FC<
+	{
+		projectId: string;
+		item: Item;
+		navigationIndex: NavigationIndex;
+	} & Omit<ComponentProps<typeof ItemRowPresentational>, "inert" | "isSelected">
+> = ({ projectId, item, navigationIndex, onClick, ...props }) => {
+	const dispatch = useAppDispatch();
+	const isSelected = useIsItemSelected({ projectId, item, navigationIndex });
+
+	return (
+		<ItemRowPresentational
+			{...props}
+			inert={!navigationIndexIncludes(navigationIndex, item)}
+			isSelected={isSelected}
+			onClick={(event) => {
+				onClick?.(event);
+				if (!event.defaultPrevented) dispatch(projectActions.selectItem({ projectId, item }));
+			}}
+		/>
+	);
+};
+
+const DependencyIndicatorButton: FC<
+	{
+		projectId: string;
+		commitIds: NonEmptyArray<string>;
+	} & useRender.ComponentProps<"button">
+> = ({ projectId, commitIds, ...restProps }) => {
+	// We use a controlled tooltip as a workaround for https://github.com/mui/base-ui/issues/4499.
+	const [isTooltipOpen, setIsTooltipOpen] = useState(false);
 	const dispatch = useAppDispatch();
 	const { data: headInfo } = useSuspenseQuery(headInfoQueryOptions(projectId));
 	// TODO: expensive
@@ -306,30 +336,35 @@ const DependencyIndicatorButton: FC<{
 	);
 	const tooltip =
 		branchNames.length > 0 ? `Depends on ${branchNames.join(", ")}` : "Unknown dependencies";
+	const highlightCommitIds = () => {
+		setIsTooltipOpen(true);
+		dispatch(
+			projectActions.setHighlightedCommitIds({
+				projectId,
+				commitIds,
+			}),
+		);
+	};
+	const clearHighlightedCommitIds = () => {
+		setIsTooltipOpen(false);
+		dispatch(projectActions.setHighlightedCommitIds({ projectId, commitIds: null }));
+	};
 
 	return (
 		<Tooltip.Root
+			open={isTooltipOpen}
 			// [ref:tooltip-disable-hoverable-popup]
 			disableHoverablePopup
 		>
 			<Tooltip.Trigger
+				{...restProps}
 				type="button"
-				className={className}
-				onMouseEnter={() => {
-					dispatch(
-						projectActions.setHighlightedCommitIds({
-							projectId,
-							commitIds,
-						}),
-					);
-				}}
-				onMouseLeave={() => {
-					dispatch(projectActions.setHighlightedCommitIds({ projectId, commitIds: null }));
-				}}
+				onMouseEnter={highlightCommitIds}
+				onMouseLeave={clearHighlightedCommitIds}
+				onFocus={highlightCommitIds}
+				onBlur={clearHighlightedCommitIds}
 				aria-label={tooltip}
-			>
-				{children}
-			</Tooltip.Trigger>
+			/>
 			<Tooltip.Portal>
 				<Tooltip.Positioner sideOffset={8}>
 					<Tooltip.Popup className={classes(uiStyles.popup, uiStyles.tooltip)}>
@@ -690,6 +725,7 @@ const CommitRow: FC<
 		projectId: string;
 		stackId: string;
 		navigationIndex: NavigationIndex;
+		focusPanel: (panel: Panel) => void;
 	} & ComponentProps<"div">
 > = ({
 	commit,
@@ -699,6 +735,7 @@ const CommitRow: FC<
 	projectId,
 	stackId,
 	navigationIndex,
+	focusPanel,
 	...restProps
 }) => {
 	const isHighlighted = useAppSelector((state) =>
@@ -727,6 +764,8 @@ const CommitRow: FC<
 		(_currentMessage, nextMessage: string) => nextMessage,
 	);
 	const [isCommitMessagePending, startCommitMessageTransition] = useTransition();
+	// We use a controlled tooltip as a workaround for https://github.com/mui/base-ui/issues/4499.
+	const [isExpandCollapseTooltipOpen, setIsExpandCollapseTooltipOpen] = useState(false);
 
 	const commitWithOptimisticMessage: Commit = {
 		...commit,
@@ -744,6 +783,7 @@ const CommitRow: FC<
 	const endEditing = () => {
 		dispatch(projectActions.exitMode({ projectId }));
 		dispatch(projectActions.selectItem({ projectId, item }));
+		focusPanel("primary");
 	};
 
 	const saveNewMessage = (newMessage: string) => {
@@ -821,8 +861,9 @@ const CommitRow: FC<
 	return (
 		<ItemRow
 			{...restProps}
-			inert={!navigationIndexIncludes(navigationIndex, item)}
-			isSelected={isSelected}
+			projectId={projectId}
+			item={item}
+			navigationIndex={navigationIndex}
 			className={classes(restProps.className, isHighlighted && styles.itemRowHighlighted)}
 		>
 			{isRewording ? (
@@ -834,15 +875,8 @@ const CommitRow: FC<
 				/>
 			) : (
 				<>
-					<button
-						type="button"
-						className={classes(
-							styles.itemRowButton,
-							isCommitMessagePending && styles.commitButtonPending,
-						)}
-						onClick={() => {
-							dispatch(projectActions.selectItem({ projectId, item }));
-						}}
+					<div
+						className={styles.itemRowLabel}
 						onContextMenu={
 							workspaceMode._tag === "Default"
 								? (event) => {
@@ -852,44 +886,47 @@ const CommitRow: FC<
 						}
 					>
 						<CommitLabel commit={commitWithOptimisticMessage} />
-					</button>
+					</div>
 					{workspaceMode._tag === "Default" && (
-						<>
+						<Toolbar.Root aria-label="Commit actions" className={styles.itemRowToolbar}>
 							<Tooltip.Root
+								open={isExpandCollapseTooltipOpen}
 								// Prevent tooltip from lingering while moving between nearby controls.
 								// [tag:tooltip-disable-hoverable-popup]
 								disableHoverablePopup
 							>
 								<Tooltip.Trigger
-									className={styles.itemRowAction}
-									type="button"
+									render={<Toolbar.Button type="button" className={styles.itemRowToolbarButton} />}
 									onClick={() =>
 										dispatch(projectActions.toggleCommitFiles({ projectId, item: commitItemV }))
 									}
-									aria-expanded={isExpanded}
-									aria-label={isExpanded ? "Hide commit files" : "Show commit files"}
+									onMouseEnter={() => setIsExpandCollapseTooltipOpen(true)}
+									onMouseLeave={() => setIsExpandCollapseTooltipOpen(false)}
+									onFocus={() => setIsExpandCollapseTooltipOpen(true)}
+									onBlur={() => setIsExpandCollapseTooltipOpen(false)}
+									aria-label={"Toggle commit files"}
 								>
 									<ExpandCollapseIcon isExpanded={isExpanded} />
 								</Tooltip.Trigger>
 								<Tooltip.Portal>
 									<Tooltip.Positioner sideOffset={8}>
 										<Tooltip.Popup className={classes(uiStyles.popup, uiStyles.tooltip)}>
-											{isExpanded ? "Hide commit files" : "Show commit files"}
+											Toggle commit files
 										</Tooltip.Popup>
 									</Tooltip.Positioner>
 								</Tooltip.Portal>
 							</Tooltip.Root>
-							<button
+							<Toolbar.Button
 								type="button"
-								className={styles.itemRowAction}
+								className={styles.itemRowToolbarButton}
 								aria-label="Commit menu"
 								onClick={(event) => {
 									void showNativeMenuFromTrigger(event.currentTarget, menuItems);
 								}}
 							>
 								<MenuTriggerIcon />
-							</button>
-						</>
+							</Toolbar.Button>
+						</Toolbar.Root>
 					)}
 				</>
 			)}
@@ -903,7 +940,6 @@ const CommitFileRow: FC<{
 	navigationIndex: NavigationIndex;
 	projectId: string;
 }> = ({ change, parentCommitItem, navigationIndex, projectId }) => {
-	const dispatch = useAppDispatch();
 	const item = commitFileItem({ ...parentCommitItem, path: change.path });
 	const isSelected = useIsItemSelected({ projectId, item, navigationIndex });
 
@@ -911,20 +947,20 @@ const CommitFileRow: FC<{
 		<OperationSourceC
 			projectId={projectId}
 			source={item}
+			id={treeItemId(projectId, item)}
+			role="treeitem"
+			aria-label={fileRowLabel(change)}
+			aria-selected={isSelected}
 			render={
 				<ItemRow
-					inert={!navigationIndexIncludes(navigationIndex, item)}
-					isSelected={isSelected}
+					projectId={projectId}
+					item={item}
+					navigationIndex={navigationIndex}
 					className={styles.fileRow}
 				/>
 			}
 		>
-			<FileButton
-				change={change}
-				onClick={() => {
-					dispatch(projectActions.selectItem({ projectId, item }));
-				}}
-			/>
+			<div className={styles.itemRowLabel}>{fileRowLabel(change)}</div>
 		</OperationSourceC>
 	);
 };
@@ -936,6 +972,7 @@ const CommitC: FC<{
 	projectId: string;
 	stackId: string;
 	navigationIndex: NavigationIndex;
+	focusPanel: (panel: Panel) => void;
 }> = ({
 	commit,
 	inlineRewordCommitFormRef,
@@ -943,6 +980,7 @@ const CommitC: FC<{
 	projectId,
 	stackId,
 	navigationIndex,
+	focusPanel,
 }) => {
 	const isExpanded = useAppSelector(
 		(state) => selectProjectExpandedCommitId(state, projectId) === commit.id,
@@ -956,6 +994,11 @@ const CommitC: FC<{
 			projectId={projectId}
 			source={item}
 			canDrag={() => !isSelected || workspaceMode._tag !== "RewordCommit"}
+			id={treeItemId(projectId, item)}
+			role="treeitem"
+			aria-label={commitTitle(commit.message)}
+			aria-selected={isSelected}
+			aria-expanded={isExpanded}
 			render={<OperationTarget item={item} projectId={projectId} isSelected={isSelected} />}
 		>
 			<CommitRow
@@ -966,6 +1009,7 @@ const CommitC: FC<{
 				projectId={projectId}
 				stackId={stackId}
 				navigationIndex={navigationIndex}
+				focusPanel={focusPanel}
 			/>
 			{isExpanded && (
 				<Suspense fallback={<div className={styles.itemRowEmpty}>Loading commit files…</div>}>
@@ -1002,7 +1046,6 @@ const ChangeFileRow: FC<{
 	workspaceMode,
 	projectId,
 }) => {
-	const dispatch = useAppDispatch();
 	const item = changeFileItem({ path: change.path });
 	const isSelected = useIsItemSelected({ projectId, item, navigationIndex });
 
@@ -1026,41 +1069,42 @@ const ChangeFileRow: FC<{
 		<OperationSourceC
 			projectId={projectId}
 			source={item}
-			render={
-				<ItemRow inert={!navigationIndexIncludes(navigationIndex, item)} isSelected={isSelected} />
-			}
+			id={treeItemId(projectId, item)}
+			role="treeitem"
+			aria-label={fileRowLabel(change)}
+			aria-selected={isSelected}
+			render={<ItemRow projectId={projectId} item={item} navigationIndex={navigationIndex} />}
 		>
-			<FileButton
-				change={change}
-				onClick={() => {
-					dispatch(projectActions.selectItem({ projectId, item }));
-				}}
+			<div
+				className={styles.itemRowLabel}
 				onContextMenu={(event) => {
 					void showNativeContextMenu(event, menuItems);
 				}}
-			/>
+			>
+				{fileRowLabel(change)}
+			</div>
 			{workspaceMode._tag === "Default" && (
-				<>
+				<Toolbar.Root aria-label="File actions" className={styles.itemRowToolbar}>
 					{dependencyCommitIds && (
 						<DependencyIndicatorButton
 							projectId={projectId}
 							commitIds={dependencyCommitIds}
-							className={styles.itemRowAction}
+							render={<Toolbar.Button type="button" className={styles.itemRowToolbarButton} />}
 						>
 							<DependencyIcon />
 						</DependencyIndicatorButton>
 					)}
-					<button
+					<Toolbar.Button
 						type="button"
-						className={styles.itemRowAction}
+						className={styles.itemRowToolbarButton}
 						aria-label="File menu"
 						onClick={(event) => {
 							void showNativeMenuFromTrigger(event.currentTarget, menuItems);
 						}}
 					>
 						<MenuTriggerIcon />
-					</button>
-				</>
+					</Toolbar.Button>
+				</Toolbar.Root>
 			)}
 		</OperationSourceC>
 	);
@@ -1070,12 +1114,11 @@ const ChangesSectionRow: FC<{
 	changes: Array<TreeChange>;
 	navigationIndex: NavigationIndex;
 	onAbsorbChanges: (target: AbsorptionTarget) => void;
+	onCommit: () => void;
 	projectId: string;
 	workspaceMode: WorkspaceMode;
-}> = ({ changes, navigationIndex, onAbsorbChanges, projectId, workspaceMode }) => {
-	const dispatch = useAppDispatch();
+}> = ({ changes, navigationIndex, onAbsorbChanges, onCommit, projectId, workspaceMode }) => {
 	const item = changesSectionItem;
-	const isSelected = useIsItemSelected({ projectId, item, navigationIndex });
 
 	const menuItems: Array<NativeMenuItem> = [
 		{
@@ -1089,80 +1132,75 @@ const ChangesSectionRow: FC<{
 	];
 
 	return (
-		<ItemRow inert={!navigationIndexIncludes(navigationIndex, item)} isSelected={isSelected}>
-			<button
-				type="button"
-				className={classes(styles.itemRowButton, styles.sectionButton)}
-				onClick={() => {
-					dispatch(projectActions.selectItem({ projectId, item }));
-				}}
+		<ItemRow projectId={projectId} item={item} navigationIndex={navigationIndex}>
+			<div
+				className={classes(styles.itemRowLabel, styles.sectionLabel)}
 				onContextMenu={(event) => {
 					void showNativeContextMenu(event, menuItems);
 				}}
 			>
 				Changes
-			</button>
+			</div>
 			{workspaceMode._tag === "Default" && (
-				<button
-					type="button"
-					className={styles.itemRowAction}
-					aria-label="Changes menu"
-					onClick={(event) => {
-						void showNativeMenuFromTrigger(event.currentTarget, menuItems);
-					}}
-				>
-					<MenuTriggerIcon />
-				</button>
+				<Toolbar.Root aria-label="Changes actions" className={styles.itemRowToolbar}>
+					<Toolbar.Button type="button" className={styles.itemRowToolbarButton} onClick={onCommit}>
+						Commit
+					</Toolbar.Button>
+					<Toolbar.Button
+						type="button"
+						className={styles.itemRowToolbarButton}
+						aria-label="Changes menu"
+						onClick={(event) => {
+							void showNativeMenuFromTrigger(event.currentTarget, menuItems);
+						}}
+					>
+						<MenuTriggerIcon />
+					</Toolbar.Button>
+				</Toolbar.Root>
 			)}
 		</ItemRow>
 	);
 };
 
-const BaseCommitRow: FC<
-	{
-		projectId: string;
-		commitId?: string;
-		navigationIndex: NavigationIndex;
-	} & ComponentProps<"div">
-> = ({ projectId, commitId, navigationIndex, ...props }) => {
-	const dispatch = useAppDispatch();
+const BaseCommit: FC<{
+	projectId: string;
+	commitId?: string;
+	navigationIndex: NavigationIndex;
+}> = ({ projectId, commitId, navigationIndex }) => {
 	const item = baseCommitItem;
 	const isSelected = useIsItemSelected({ projectId, item, navigationIndex });
 
 	return (
-		<OperationTarget
-			projectId={projectId}
-			item={item}
-			isSelected={isSelected}
-			render={
-				<ItemRow
-					{...props}
-					inert={!navigationIndexIncludes(navigationIndex, item)}
-					isSelected={isSelected}
-				>
-					<button
-						type="button"
-						className={styles.commonBaseCommit}
-						onClick={() => {
-							dispatch(projectActions.selectItem({ projectId, item }));
-						}}
-					>
-						{commitId !== undefined
-							? `${shortCommitId(commitId)} (common base commit)`
-							: "(base commit)"}
-					</button>
-				</ItemRow>
-			}
-		/>
+		<div className={styles.section}>
+			<OperationTarget
+				projectId={projectId}
+				item={item}
+				isSelected={isSelected}
+				id={treeItemId(projectId, item)}
+				role="treeitem"
+				aria-label="Base commit"
+				aria-selected={isSelected}
+				render={
+					<ItemRow projectId={projectId} item={item} navigationIndex={navigationIndex}>
+						<div className={classes(styles.itemRowLabel, styles.sectionLabel)}>
+							{commitId !== undefined
+								? `${shortCommitId(commitId)} (common base commit)`
+								: "(base commit)"}
+						</div>
+					</ItemRow>
+				}
+			/>
+		</div>
 	);
 };
 
 const Changes: FC<{
 	projectId: string;
 	onAbsorbChanges: (target: AbsorptionTarget) => void;
+	onCommit: () => void;
 	navigationIndex: NavigationIndex;
 	workspaceMode: WorkspaceMode;
-}> = ({ projectId, onAbsorbChanges, navigationIndex, workspaceMode }) => {
+}> = ({ projectId, onAbsorbChanges, onCommit, navigationIndex, workspaceMode }) => {
 	const { data: worktreeChanges } = useSuspenseQuery(changesInWorktreeQueryOptions(projectId));
 
 	const hunkDependencyDiffsByPath = getHunkDependencyDiffsByPath(
@@ -1177,19 +1215,25 @@ const Changes: FC<{
 			projectId={projectId}
 			source={item}
 			className={styles.section}
+			id={treeItemId(projectId, item)}
+			role="treeitem"
+			aria-label="Changes"
+			aria-selected={isSelected}
+			aria-expanded
 			render={<OperationTarget item={item} projectId={projectId} isSelected={isSelected} />}
 		>
 			<ChangesSectionRow
 				changes={worktreeChanges.changes}
 				navigationIndex={navigationIndex}
 				onAbsorbChanges={onAbsorbChanges}
+				onCommit={onCommit}
 				projectId={projectId}
 				workspaceMode={workspaceMode}
 			/>
 			{worktreeChanges.changes.length === 0 ? (
 				<div className={styles.itemRowEmpty}>No changes.</div>
 			) : (
-				<ul>
+				<div role="group">
 					{worktreeChanges.changes.map((change) => {
 						const hunkDependencyDiffs = hunkDependencyDiffsByPath.get(change.path);
 						const dependencyCommitIds = hunkDependencyDiffs
@@ -1197,19 +1241,18 @@ const Changes: FC<{
 							: undefined;
 
 						return (
-							<li key={change.path}>
-								<ChangeFileRow
-									change={change}
-									dependencyCommitIds={dependencyCommitIds}
-									navigationIndex={navigationIndex}
-									onAbsorbChanges={onAbsorbChanges}
-									workspaceMode={workspaceMode}
-									projectId={projectId}
-								/>
-							</li>
+							<ChangeFileRow
+								key={change.path}
+								change={change}
+								dependencyCommitIds={dependencyCommitIds}
+								navigationIndex={navigationIndex}
+								onAbsorbChanges={onAbsorbChanges}
+								workspaceMode={workspaceMode}
+								projectId={projectId}
+							/>
 						);
 					})}
-				</ul>
+				</div>
 			)}
 		</OperationSourceC>
 	);
@@ -1243,17 +1286,16 @@ const InlineRenameBranch: FC<{
 	);
 };
 
-const BranchRow: FC<
-	{
-		inlineRenameBranchFormRef: Ref<HTMLFormElement>;
-		workspaceMode: WorkspaceMode;
-		projectId: string;
-		branchName: string;
-		branchRef: Array<number>;
-		stackId: string;
-		navigationIndex: NavigationIndex;
-	} & ComponentProps<"div">
-> = ({
+const BranchRow: FC<{
+	inlineRenameBranchFormRef: Ref<HTMLFormElement>;
+	workspaceMode: WorkspaceMode;
+	projectId: string;
+	branchName: string;
+	branchRef: Array<number>;
+	stackId: string;
+	navigationIndex: NavigationIndex;
+	focusPanel: (panel: Panel) => void;
+}> = ({
 	inlineRenameBranchFormRef,
 	workspaceMode,
 	projectId,
@@ -1261,7 +1303,7 @@ const BranchRow: FC<
 	branchRef,
 	stackId,
 	navigationIndex,
-	...restProps
+	focusPanel,
 }) => {
 	const dispatch = useAppDispatch();
 	const branchItemV: BranchItem = {
@@ -1269,7 +1311,6 @@ const BranchRow: FC<
 		branchRef,
 	};
 	const item = branchItem(branchItemV);
-	const isSelected = useIsItemSelected({ projectId, item, navigationIndex });
 	const isRenaming =
 		workspaceMode._tag === "RenameBranch" &&
 		itemEquals(
@@ -1294,6 +1335,7 @@ const BranchRow: FC<
 	const endEditing = () => {
 		dispatch(projectActions.exitMode({ projectId }));
 		dispatch(projectActions.selectItem({ projectId, item }));
+		focusPanel("primary");
 	};
 
 	const saveBranchName = (newBranchName: string) => {
@@ -1333,62 +1375,53 @@ const BranchRow: FC<
 	];
 
 	return (
-		<OperationSourceC
-			{...restProps}
-			projectId={projectId}
-			source={item}
-			render={
-				<ItemRow inert={!navigationIndexIncludes(navigationIndex, item)} isSelected={isSelected}>
-					{isRenaming ? (
-						<InlineRenameBranch
-							branchName={optimisticBranchName}
-							formRef={inlineRenameBranchFormRef}
-							onSubmit={saveBranchName}
-							onExit={endEditing}
-						/>
-					) : (
-						<>
-							<button
+		<ItemRow projectId={projectId} item={item} navigationIndex={navigationIndex}>
+			{isRenaming ? (
+				<InlineRenameBranch
+					branchName={optimisticBranchName}
+					formRef={inlineRenameBranchFormRef}
+					onSubmit={saveBranchName}
+					onExit={endEditing}
+				/>
+			) : (
+				<>
+					<div
+						className={classes(styles.itemRowLabel, styles.sectionLabel)}
+						onContextMenu={
+							workspaceMode._tag === "Default"
+								? (event) => {
+										void showNativeContextMenu(event, menuItems);
+									}
+								: undefined
+						}
+					>
+						{optimisticBranchName}
+					</div>
+					{workspaceMode._tag === "Default" && (
+						<Toolbar.Root aria-label="Branch actions" className={styles.itemRowToolbar}>
+							<Toolbar.Button
 								type="button"
-								className={classes(styles.itemRowButton, styles.sectionButton)}
-								onClick={() => dispatch(projectActions.selectItem({ projectId, item }))}
-								onContextMenu={
-									workspaceMode._tag === "Default"
-										? (event) => {
-												void showNativeContextMenu(event, menuItems);
-											}
-										: undefined
-								}
+								className={styles.itemRowToolbarButton}
+								aria-label="Push branch"
+								disabled
 							>
-								{optimisticBranchName}
-							</button>
-							{workspaceMode._tag === "Default" && (
-								<>
-									<button
-										type="button"
-										className={styles.itemRowAction}
-										aria-label="Push branch"
-										disabled
-									>
-										<PushIcon />
-									</button>
-									<button
-										type="button"
-										className={styles.itemRowAction}
-										aria-label="Branch menu"
-										onClick={(event) => {
-											void showNativeMenuFromTrigger(event.currentTarget, menuItems);
-										}}
-									>
-										<MenuTriggerIcon />
-									</button>
-								</>
-							)}
-						</>
+								<PushIcon />
+							</Toolbar.Button>
+							<Toolbar.Button
+								type="button"
+								className={styles.itemRowToolbarButton}
+								aria-label="Branch menu"
+								onClick={(event) => {
+									void showNativeMenuFromTrigger(event.currentTarget, menuItems);
+								}}
+							>
+								<MenuTriggerIcon />
+							</Toolbar.Button>
+						</Toolbar.Root>
 					)}
-				</ItemRow>
-			}
-		/>
+				</>
+			)}
+		</ItemRow>
 	);
 };
 
@@ -1400,9 +1433,7 @@ const StackRow: FC<
 		workspaceMode: WorkspaceMode;
 	} & ComponentProps<"div">
 > = ({ navigationIndex, projectId, stackId, workspaceMode, ...restProps }) => {
-	const dispatch = useAppDispatch();
 	const item = stackItem({ stackId });
-	const isSelected = useIsItemSelected({ projectId, item, navigationIndex });
 
 	const unapplyStack = useMutation(unapplyStackMutationOptions);
 
@@ -1421,17 +1452,9 @@ const StackRow: FC<
 	];
 
 	return (
-		<ItemRow
-			{...restProps}
-			isSelected={isSelected}
-			inert={!navigationIndexIncludes(navigationIndex, item)}
-		>
-			<button
-				type="button"
-				className={classes(styles.itemRowButton, styles.sectionButton)}
-				onClick={() => {
-					dispatch(projectActions.selectItem({ projectId, item }));
-				}}
+		<ItemRow {...restProps} projectId={projectId} item={item} navigationIndex={navigationIndex}>
+			<div
+				className={classes(styles.itemRowLabel, styles.sectionLabel)}
 				onContextMenu={
 					workspaceMode._tag === "Default"
 						? (event) => {
@@ -1441,24 +1464,26 @@ const StackRow: FC<
 				}
 			>
 				Stack
-			</button>
+			</div>
 			{workspaceMode._tag === "Default" && (
-				<button
-					type="button"
-					className={styles.itemRowAction}
-					aria-label="Stack menu"
-					onClick={(event) => {
-						void showNativeMenuFromTrigger(event.currentTarget, menuItems);
-					}}
-				>
-					<MenuTriggerIcon />
-				</button>
+				<Toolbar.Root aria-label="Stack actions" className={styles.itemRowToolbar}>
+					<Toolbar.Button
+						type="button"
+						className={styles.itemRowToolbarButton}
+						aria-label="Stack menu"
+						onClick={(event) => {
+							void showNativeMenuFromTrigger(event.currentTarget, menuItems);
+						}}
+					>
+						<MenuTriggerIcon />
+					</Toolbar.Button>
+				</Toolbar.Root>
 			)}
 		</ItemRow>
 	);
 };
 
-const SegmentC: FC<{
+const BranchSegment: FC<{
 	inlineRenameBranchFormRef: Ref<HTMLFormElement>;
 	inlineRewordCommitFormRef: Ref<HTMLFormElement>;
 	navigationIndex: NavigationIndex;
@@ -1466,6 +1491,7 @@ const SegmentC: FC<{
 	segment: Segment;
 	stackId: string;
 	workspaceMode: WorkspaceMode;
+	focusPanel: (panel: Panel) => void;
 }> = ({
 	inlineRenameBranchFormRef,
 	inlineRewordCommitFormRef,
@@ -1474,76 +1500,99 @@ const SegmentC: FC<{
 	segment,
 	stackId,
 	workspaceMode,
+	focusPanel,
 }) => {
-	const section = (
-		<div className={classes(styles.section, styles.segment)}>
-			{segment.refName && (
-				<BranchRow
-					inlineRenameBranchFormRef={inlineRenameBranchFormRef}
-					workspaceMode={workspaceMode}
-					projectId={projectId}
-					branchName={segment.refName.displayName}
-					branchRef={segment.refName.fullNameBytes}
-					stackId={stackId}
-					navigationIndex={navigationIndex}
-				/>
-			)}
-
-			{segment.commits.length === 0 ? (
-				<div className={styles.itemRowEmpty}>No commits.</div>
-			) : (
-				<ul>
-					{segment.commits.map((commit) => (
-						<li key={commit.id}>
-							<CommitC
-								commit={commit}
-								inlineRewordCommitFormRef={inlineRewordCommitFormRef}
-								workspaceMode={workspaceMode}
-								projectId={projectId}
-								stackId={stackId}
-								navigationIndex={navigationIndex}
-							/>
-						</li>
-					))}
-				</ul>
-			)}
-		</div>
-	);
-
-	return segment.refName ? (
-		<BranchOperationTarget
-			projectId={projectId}
-			branchRef={segment.refName.fullNameBytes}
-			stackId={stackId}
-			navigationIndex={navigationIndex}
-			render={section}
-		/>
-	) : (
-		section
-	);
-};
-
-const BranchOperationTarget: FC<
-	{
-		projectId: string;
-		branchRef: Array<number>;
-		stackId: string;
-		navigationIndex: NavigationIndex;
-	} & useRender.ComponentProps<"div">
-> = ({ projectId, branchRef, stackId, navigationIndex, render, ...restProps }) => {
-	const item = branchItem({ stackId, branchRef });
+	const refName = assert(segment.refName);
+	const item = branchItem({ stackId, branchRef: refName.fullNameBytes });
 	const isSelected = useIsItemSelected({ projectId, item, navigationIndex });
 
 	return (
-		<OperationTarget
-			{...restProps}
+		<OperationSourceC
 			projectId={projectId}
-			item={item}
-			isSelected={isSelected}
-			render={render}
+			source={item}
+			render={
+				<OperationTarget
+					projectId={projectId}
+					item={item}
+					isSelected={isSelected}
+					render={
+						<div
+							id={treeItemId(projectId, item)}
+							role="treeitem"
+							aria-label={refName.displayName}
+							aria-selected={isSelected}
+							aria-expanded
+							className={classes(styles.section, styles.segment)}
+						>
+							<BranchRow
+								inlineRenameBranchFormRef={inlineRenameBranchFormRef}
+								workspaceMode={workspaceMode}
+								projectId={projectId}
+								branchName={refName.displayName}
+								branchRef={refName.fullNameBytes}
+								stackId={stackId}
+								navigationIndex={navigationIndex}
+								focusPanel={focusPanel}
+							/>
+
+							{segment.commits.length === 0 ? (
+								<div className={styles.itemRowEmpty}>No commits.</div>
+							) : (
+								<div role="group">
+									{segment.commits.map((commit) => (
+										<CommitC
+											key={commit.id}
+											commit={commit}
+											inlineRewordCommitFormRef={inlineRewordCommitFormRef}
+											workspaceMode={workspaceMode}
+											projectId={projectId}
+											stackId={stackId}
+											navigationIndex={navigationIndex}
+											focusPanel={focusPanel}
+										/>
+									))}
+								</div>
+							)}
+						</div>
+					}
+				/>
+			}
 		/>
 	);
 };
+
+const BranchlessSegment: FC<{
+	inlineRewordCommitFormRef: Ref<HTMLFormElement>;
+	navigationIndex: NavigationIndex;
+	projectId: string;
+	segment: Segment;
+	stackId: string;
+	workspaceMode: WorkspaceMode;
+	focusPanel: (panel: Panel) => void;
+}> = ({
+	inlineRewordCommitFormRef,
+	navigationIndex,
+	projectId,
+	segment,
+	stackId,
+	workspaceMode,
+	focusPanel,
+}) => (
+	<div role="group" className={classes(styles.section, styles.segment)}>
+		{segment.commits.map((commit) => (
+			<CommitC
+				key={commit.id}
+				commit={commit}
+				inlineRewordCommitFormRef={inlineRewordCommitFormRef}
+				workspaceMode={workspaceMode}
+				projectId={projectId}
+				stackId={stackId}
+				navigationIndex={navigationIndex}
+				focusPanel={focusPanel}
+			/>
+		))}
+	</div>
+);
 
 const StackC: FC<{
 	inlineRenameBranchFormRef: Ref<HTMLFormElement>;
@@ -1552,6 +1601,7 @@ const StackC: FC<{
 	stack: Stack;
 	workspaceMode: WorkspaceMode;
 	navigationIndex: NavigationIndex;
+	focusPanel: (panel: Panel) => void;
 }> = ({
 	inlineRenameBranchFormRef,
 	inlineRewordCommitFormRef,
@@ -1559,6 +1609,7 @@ const StackC: FC<{
 	stack,
 	workspaceMode,
 	navigationIndex,
+	focusPanel,
 }) => {
 	// From Caleb:
 	// > There shouldn't be a way within GitButler to end up with a stack without a
@@ -1569,9 +1620,18 @@ const StackC: FC<{
 	// could genuinely be null (assuming backend correctness).
 	// oxlint-disable-next-line typescript/no-non-null-assertion -- [tag:stack-id-required]
 	const stackId = stack.id!;
+	const item = stackItem({ stackId });
+	const isSelected = useIsItemSelected({ projectId, item, navigationIndex });
 
 	return (
-		<div className={classes(styles.stack, styles.section)}>
+		<div
+			id={treeItemId(projectId, item)}
+			role="treeitem"
+			aria-label="Stack"
+			aria-selected={isSelected}
+			aria-expanded
+			className={classes(styles.stack, styles.section)}
+		>
 			<StackRow
 				workspaceMode={workspaceMode}
 				projectId={projectId}
@@ -1580,7 +1640,7 @@ const StackC: FC<{
 				className={styles.stackRow}
 			/>
 
-			<ul className={styles.segments}>
+			<div role="group" className={styles.segments}>
 				{stack.segments.map((segment) => {
 					const branchRef = segment.refName?.fullNameBytes;
 
@@ -1592,21 +1652,32 @@ const StackC: FC<{
 							// least one commit, so this assertion should be safe.
 							assert(segment.commits[0]).id;
 
-					return (
-						<li key={segmentKey}>
-							<SegmentC
-								inlineRenameBranchFormRef={inlineRenameBranchFormRef}
-								inlineRewordCommitFormRef={inlineRewordCommitFormRef}
-								navigationIndex={navigationIndex}
-								projectId={projectId}
-								segment={segment}
-								stackId={stackId}
-								workspaceMode={workspaceMode}
-							/>
-						</li>
+					return branchRef ? (
+						<BranchSegment
+							key={segmentKey}
+							inlineRenameBranchFormRef={inlineRenameBranchFormRef}
+							inlineRewordCommitFormRef={inlineRewordCommitFormRef}
+							navigationIndex={navigationIndex}
+							projectId={projectId}
+							segment={segment}
+							stackId={stackId}
+							workspaceMode={workspaceMode}
+							focusPanel={focusPanel}
+						/>
+					) : (
+						<BranchlessSegment
+							key={segmentKey}
+							inlineRewordCommitFormRef={inlineRewordCommitFormRef}
+							navigationIndex={navigationIndex}
+							projectId={projectId}
+							segment={segment}
+							stackId={stackId}
+							workspaceMode={workspaceMode}
+							focusPanel={focusPanel}
+						/>
 					);
 				})}
-			</ul>
+			</div>
 		</div>
 	);
 };
@@ -1653,10 +1724,11 @@ const ProjectPage: FC = () => {
 	const expandedCommitId = useAppSelector((state) =>
 		selectProjectExpandedCommitId(state, projectId),
 	);
-	const layoutState = useAppSelector((state) => selectProjectLayoutState(state, projectId));
 	const workspaceMode = useAppSelector((state) =>
 		selectProjectWorkspaceModeState(state, projectId),
 	);
+	const { focusAdjacentPanel, focusPanel, panelElementRef } = useProjectPanelFocusManager();
+	const focusedPanel = useFocusedProjectPanel();
 
 	const workspaceOutline = useWorkspaceOutline({ projectId, expandedCommitId });
 
@@ -1674,17 +1746,26 @@ const ProjectPage: FC = () => {
 		selectNormalizedSelectedItem(state, { projectId, navigationIndex: navigationIndexUnfiltered }),
 	);
 
+	const operationMode = useAppSelector((state) =>
+		selectProjectOperationModeState(state, projectId),
+	);
+
 	const navigationIndex =
 		workspaceMode._tag !== "Default"
 			? filterNavigationIndex(
 					navigationIndexUnfiltered,
 					(item) =>
+						// When entering operation mode, the selected item must still be
+						// selectable otherwise the preview will suddenly appear to change
+						// and the user may lose sight of their source item (e.g. hunk).
 						(selectedItem && itemEquals(selectedItem, item)) ||
+						// After selection moves, allow returning selection to the source item.
+						(operationMode?.source && itemEquals(operationMode.source, item)) ||
 						includeItemForWorkspaceMode({ mode: workspaceMode, item }),
 				)
 			: navigationIndexUnfiltered;
 
-	const shortcutScope = getScope({ selectedItem, layoutState, workspaceMode });
+	const shortcutScope = getScope({ selectedItem, focusedPanel, workspaceMode });
 
 	const [absorptionTarget, setAbsorptionTarget] = useState<AbsorptionTarget | null>(null);
 
@@ -1710,11 +1791,9 @@ const ProjectPage: FC = () => {
 		navigationIndex,
 		openAbsorptionDialog,
 		openBranchPicker: () => setBranchPickerOpen(true),
+		focusPanel,
+		focusAdjacentPanel,
 	});
-
-	const operationMode = useAppSelector((state) =>
-		selectProjectOperationModeState(state, projectId),
-	);
 
 	// TODO: handle project not found error. or only run when project is not null? waterfall.
 	const { data: headInfo } = useSuspenseQuery(headInfoQueryOptions(projectId));
@@ -1743,62 +1822,64 @@ const ProjectPage: FC = () => {
 		);
 
 	return (
-		<ProjectPreviewLayout
-			projectId={projectId}
-			preview={
-				selectedItem && (
-					<Suspense fallback={<div>Loading preview…</div>}>
-						<Preview projectId={projectId} selectedItem={selectedItem} />
-					</Suspense>
-				)
-			}
-		>
-			<div className={styles.sections}>
-				<div className={styles.changesContainer}>
+		<>
+			<ProjectPreviewLayout
+				projectId={projectId}
+				activeDescendantId={selectedItem ? treeItemId(projectId, selectedItem) : undefined}
+				panelElementRef={panelElementRef}
+				preview={
+					selectedItem && (
+						<Suspense fallback={<div>Loading preview…</div>}>
+							<Preview projectId={projectId} selectedItem={selectedItem} />
+						</Suspense>
+					)
+				}
+			>
+				<div className={styles.sections}>
 					<Changes
 						projectId={projectId}
 						onAbsorbChanges={openAbsorptionDialog}
+						onCommit={commit}
 						navigationIndex={navigationIndex}
 						workspaceMode={workspaceMode}
 					/>
 
-					<button type="button" className={uiStyles.button} onClick={commit}>
-						Commit
-					</button>
-				</div>
+					{headInfo.stacks.map((stack) => (
+						<StackC
+							key={stack.id}
+							inlineRenameBranchFormRef={inlineRenameBranchFormRef}
+							inlineRewordCommitFormRef={inlineRewordCommitFormRef}
+							projectId={project.id}
+							stack={stack}
+							workspaceMode={workspaceMode}
+							navigationIndex={navigationIndex}
+							focusPanel={focusPanel}
+						/>
+					))}
 
-				{headInfo.stacks.map((stack) => (
-					<StackC
-						key={stack.id}
-						inlineRenameBranchFormRef={inlineRenameBranchFormRef}
-						inlineRewordCommitFormRef={inlineRewordCommitFormRef}
-						projectId={project.id}
-						stack={stack}
-						workspaceMode={workspaceMode}
-						navigationIndex={navigationIndex}
-					/>
-				))}
-
-				<div className={styles.section}>
-					<BaseCommitRow
+					<BaseCommit
 						projectId={projectId}
 						commitId={getCommonBaseCommitId(headInfo)}
 						navigationIndex={navigationIndex}
 					/>
 				</div>
-			</div>
+
+				{Match.value(operationMode).pipe(
+					Match.when(null, () => null),
+					Match.tag("DragAndDrop", () => null),
+					Match.orElse(({ source }) => (
+						<div className={styles.operationModePreview}>
+							<OperationSourceLabel headInfo={headInfo} source={source} />
+						</div>
+					)),
+				)}
+			</ProjectPreviewLayout>
 
 			{shortcutScope && (
 				<PositionedShortcutsBar
 					label={getScopeLabel(shortcutScope)}
 					items={getScopeBindings(shortcutScope)}
 				/>
-			)}
-
-			{operationMode && (
-				<div className={styles.operationModePreview}>
-					<OperationSourceLabel headInfo={headInfo} source={operationMode.source} />
-				</div>
 			)}
 
 			{absorptionTarget && (
@@ -1830,7 +1911,7 @@ const ProjectPage: FC = () => {
 				onSelectItem={selectBranch}
 				placeholder="Search for branches…"
 			/>
-		</ProjectPreviewLayout>
+		</>
 	);
 };
 

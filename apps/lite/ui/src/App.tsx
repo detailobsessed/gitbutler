@@ -16,11 +16,7 @@ export const App: React.FC<{
 		<Provider store={store}>
 			<QueryClientProvider client={queryClient}>
 				<Toast.Provider toastManager={toastManager}>
-					<Tooltip.Provider
-						// Workaround for flicker issue when nesting tooltips
-						// https://github.com/mui/base-ui/issues/4499
-						delay={0}
-					>
+					<Tooltip.Provider>
 						<RouterProvider router={router} />
 						<Toasts />
 					</Tooltip.Provider>

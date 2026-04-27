@@ -14,6 +14,7 @@ but-core = { workspace = true, features = ["legacy"] }
 but-gerrit.workspace = true
 but-oxidize.workspace = true
 but-ctx = { workspace = true, features = ["legacy"] }
+but-hooks.workspace = true
 
 gitbutler-project.workspace = true
 gitbutler-reference.workspace = true

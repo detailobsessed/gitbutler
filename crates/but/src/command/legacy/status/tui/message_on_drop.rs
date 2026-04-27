@@ -10,7 +10,7 @@ use crate::command::legacy::status::tui::Message;
 pub(super) fn message_on_drop(msg: Message, messages: &mut Vec<Message>) -> MessageOnDrop {
     let (tx, rx) = std::sync::mpsc::channel::<Message>();
 
-    messages.push(Message::RegisterMessageOnDrop(Rc::new(rx)));
+    messages.push(Message::RegisterOutOfBandMessage(Rc::new(rx)));
 
     MessageOnDrop(Rc::new(Shared {
         tx,

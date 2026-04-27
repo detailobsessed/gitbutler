@@ -61,8 +61,8 @@ pub fn safe_checkout(
 
     let mut delegate = super::utils::Delegate::default();
     gix::diff::tree(
-        TreeRefIter::from_bytes(&source_tree.data),
-        TreeRefIter::from_bytes(&destination_tree.data),
+        TreeRefIter::from_bytes(&source_tree.data, repo.object_hash()),
+        TreeRefIter::from_bytes(&destination_tree.data, repo.object_hash()),
         &mut gix::diff::tree::State::default(),
         repo,
         &mut delegate,

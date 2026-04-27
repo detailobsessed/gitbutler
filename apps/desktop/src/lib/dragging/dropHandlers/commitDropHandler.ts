@@ -59,9 +59,8 @@ export class MoveCommitDzHandler implements DropzoneHandler {
 	accepts(data: unknown): boolean {
 		return (
 			data instanceof CommitDropData &&
-			!data.isMultiCommit &&
 			data.stackId !== this.stackId &&
-			!data.commit.hasConflicts
+			!data.allCommits.some((c) => c.hasConflicts)
 		);
 	}
 
@@ -71,22 +70,26 @@ export class MoveCommitDzHandler implements DropzoneHandler {
 			targetCommitId: "top",
 		});
 
-		// Clear the selection from the source lane if this commit was selected
+		// Clear the selection from the source lane if any dragged commit was selected
 		const sourceSelection = untrack(() => this.uiState.lane(data.stackId).selection.current);
-		if (sourceSelection?.commitId === data.commit.id) {
+		if (
+			sourceSelection?.commitId &&
+			data.allCommits.some((c) => c.id === sourceSelection.commitId)
+		) {
 			this.uiState.lane(data.stackId).selection.set(undefined);
 		}
 
+		const commitIds = data.allCommits.map((c) => c.id);
 		let result: DropResult | undefined;
 		await withStackBusy(
 			this.uiState,
 			this.projectId,
-			{ commitId: data.commit.id, stackIds: [data.stackId, this.stackId] },
+			{ stackIds: [data.stackId, this.stackId] },
 			async () => {
 				try {
 					await this.stackService.commitMove({
 						projectId: this.projectId,
-						subjectCommitIds: [data.commit.id],
+						subjectCommitIds: commitIds,
 						relativeTo,
 						side,
 						dryRun: false,
@@ -95,7 +98,7 @@ export class MoveCommitDzHandler implements DropzoneHandler {
 					const { description, message } = parseError(error);
 					result = {
 						type: "warning",
-						title: "Cannot move commit",
+						title: "Cannot move commits",
 						message: description ?? message,
 					};
 				}

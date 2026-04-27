@@ -11,12 +11,12 @@ function createEndpointBuilder(): BackendEndpointBuilder {
 }
 
 describe("buildStackEndpoints", () => {
-	test("maps uncommit to commit_undo with the new request shape", () => {
+	test("maps uncommit to commit_uncommit with the new request shape", () => {
 		const endpoints = buildStackEndpoints(createEndpointBuilder());
 		const query = endpoints.uncommit.query;
 
 		expect(endpoints.uncommit.extraOptions).toEqual({
-			command: "commit_undo",
+			command: "commit_uncommit",
 			actionName: "Uncommit",
 		});
 		expect(query).toBeDefined();
@@ -24,11 +24,11 @@ describe("buildStackEndpoints", () => {
 			query?.({
 				projectId: "project-1",
 				stackId: "stack-1",
-				commitId: "commit-1",
+				commitIds: ["commit-1"],
 			}),
 		).toEqual({
 			projectId: "project-1",
-			subjectCommitId: "commit-1",
+			subjectCommitIds: ["commit-1"],
 			assignTo: "stack-1",
 			dryRun: false,
 		});

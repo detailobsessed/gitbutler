@@ -52,7 +52,7 @@ commands.allow = [
   "commit_move",
   "commit_move_changes_between",
   "commit_reword",
-  "commit_undo",
+  "commit_uncommit",
   "commit_uncommit_changes",
   "create_branch",
   "create_reference",

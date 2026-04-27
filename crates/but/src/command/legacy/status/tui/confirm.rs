@@ -9,17 +9,22 @@ use ratatui::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use crate::{command::legacy::status::tui::Message, theme, utils::DebugAsType};
+use crate::{command::legacy::status::tui::Message, theme::Theme, utils::DebugAsType};
 
 #[derive(Debug)]
 pub(super) struct Confirm {
     text: Cow<'static, str>,
     yes_selected: bool,
     on_yes: DebugAsType<Box<dyn FnOnce(&mut Context, &mut Vec<Message>) -> anyhow::Result<()>>>,
+    theme: &'static Theme,
 }
 
 impl Confirm {
-    pub(super) fn new<F>(text: impl Into<Cow<'static, str>>, on_yes: F) -> Self
+    pub(super) fn new<F>(
+        text: impl Into<Cow<'static, str>>,
+        theme: &'static Theme,
+        on_yes: F,
+    ) -> Self
     where
         F: FnOnce(&mut Context, &mut Vec<Message>) -> anyhow::Result<()> + 'static,
     {
@@ -27,6 +32,7 @@ impl Confirm {
             text: text.into(),
             yes_selected: true,
             on_yes: DebugAsType(Box::new(on_yes)),
+            theme,
         }
     }
 
@@ -41,8 +47,8 @@ impl Confirm {
             ListItem::new(&*self.text),
             ListItem::new(""),
             ListItem::new(Line::from_iter([
-                style_button(Span::raw("  Yes  "), self.yes_selected),
-                style_button(Span::raw("  No  "), !self.yes_selected),
+                style_button(Span::raw("  Yes  "), self.yes_selected, self.theme),
+                style_button(Span::raw("  No  "), !self.yes_selected, self.theme),
             ])),
         ]);
 
@@ -62,7 +68,7 @@ impl Confirm {
             Block::bordered()
                 .padding(padding)
                 .border_type(BorderType::Rounded)
-                .border_style(theme::get().border),
+                .border_style(self.theme.border),
         );
 
         frame.render_widget(Clear, centered_layout[0]);
@@ -100,12 +106,11 @@ impl Confirm {
     }
 }
 
-fn style_button(span: Span<'static>, selected: bool) -> Span<'static> {
-    let t = theme::get();
+fn style_button(span: Span<'static>, selected: bool, theme: &'static Theme) -> Span<'static> {
     if selected {
-        span.style(t.selection_highlight)
+        span.style(theme.selection_highlight)
     } else {
-        span.style(t.hint)
+        span.style(theme.hint)
     }
 }
 

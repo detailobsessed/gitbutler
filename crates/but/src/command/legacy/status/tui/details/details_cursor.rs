@@ -18,7 +18,8 @@ impl DetailsCursor {
         else {
             return;
         };
-        let Some(next) = sections.get(f(current_selection_idx)) else {
+        let Some(next) = sections.get(std::cmp::min(f(current_selection_idx), sections.len() - 1))
+        else {
             return;
         };
         self.select_section(next.id.clone());

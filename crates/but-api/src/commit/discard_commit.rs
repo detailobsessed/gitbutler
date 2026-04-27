@@ -7,11 +7,14 @@ use tracing::instrument;
 
 use crate::commit::types::CommitDiscardResult;
 
-/// Discard `subject_commit_id` using the behavior described by
-/// [`commit_discard_only_with_perm()`].
+/// Discard `subject_commit_id`, removing it from the branch history.
+///
+/// Unlike [`super::uncommit::commit_uncommit()`], the commit's changes are **not**
+/// reassigned to the workspace — they are permanently removed from the branch.
 ///
 /// When `dry_run` is enabled, the returned workspace previews the discard
 /// without materializing the rebase.
+/// See [`commit_discard_only_with_perm()`] for details.
 #[but_api(try_from = crate::commit::json::CommitDiscardResult)]
 pub fn commit_discard_only(
     ctx: &mut but_ctx::Context,
@@ -24,11 +27,10 @@ pub fn commit_discard_only(
 
 /// Discard `subject_commit_id` under caller-held exclusive repository access.
 ///
-/// This materializes the discard rebase and returns the commit-ID mapping for
-/// rewritten descendants. When `dry_run` is enabled, it returns the projected
-/// workspace state without materializing the rebase. This variant does not
-/// create an oplog entry. For lower-level implementation details, see
-/// [`but_workspace::commit::discard_commit()`].
+/// The commit is removed from branch history and its changes are **lost**
+/// (not reassigned to the workspace). This variant does not create an oplog
+/// entry. When `dry_run` is enabled, it returns the projected workspace state
+/// without materializing the rebase.
 pub fn commit_discard_only_with_perm(
     ctx: &mut but_ctx::Context,
     subject_commit_id: gix::ObjectId,
@@ -39,7 +41,7 @@ pub fn commit_discard_only_with_perm(
     let (repo, mut ws, _) = ctx.workspace_mut_and_db_with_perm(perm)?;
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
 
-    let rebase = but_workspace::commit::discard_commit(editor, subject_commit_id)?;
+    let rebase = but_workspace::commit::discard_commits(editor, [subject_commit_id])?;
 
     let workspace = WorkspaceState::from_successful_rebase(rebase, &repo, dry_run)?;
 
@@ -49,11 +51,13 @@ pub fn commit_discard_only_with_perm(
     })
 }
 
-/// Discard `subject_commit_id` using the behavior described by
-/// [`commit_discard_with_perm()`].
+/// Discard `subject_commit_id`, removing it from the branch history.
+///
+/// Unlike [`super::uncommit::commit_uncommit()`], the commit's changes are **not**
+/// reassigned to the workspace — they are permanently removed from the branch.
 ///
 /// When `dry_run` is enabled, the returned workspace previews the discard and
-/// no oplog entry is persisted.
+/// no oplog entry is persisted. See [`commit_discard_with_perm()`] for details.
 #[but_api(napi, try_from = crate::commit::json::CommitDiscardResult)]
 #[instrument(err(Debug))]
 pub fn commit_discard(
@@ -68,12 +72,10 @@ pub fn commit_discard(
 /// Discard `subject_commit_id` under caller-held exclusive repository access
 /// and record an oplog snapshot on success.
 ///
-/// This prepares a best-effort `DiscardCommit` oplog snapshot annotated with
-/// `subject_commit_id`, discards the commit, and commits the snapshot only if
-/// the operation succeeds. When `dry_run` is enabled, it returns the projected
-/// workspace state and skips oplog persistence. For lower-level implementation
-/// details, see
-/// [`but_workspace::commit::discard_commit()`].
+/// The commit is removed from branch history and its changes are **lost**
+/// (not reassigned to the workspace). An oplog snapshot is recorded so the
+/// operation can be reverted from the timeline. When `dry_run` is enabled,
+/// it returns the projected workspace state and skips oplog persistence.
 pub fn commit_discard_with_perm(
     ctx: &mut but_ctx::Context,
     subject_commit_id: gix::ObjectId,

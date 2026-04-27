@@ -1,30 +1,70 @@
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useRef, useSyncExternalStore } from "react";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
-import { classes } from "#ui/classes.ts";
 import {
-	getFocus,
 	getVisiblePanels,
 	isPreviewPanelVisible,
+	orderedPanels,
 	Panel as PanelType,
 } from "#ui/routes/project/$id/state/layout.ts";
-import {
-	projectActions,
-	selectProjectLayoutState,
-} from "#ui/routes/project/$id/state/projectSlice.ts";
-import { useAppDispatch, useAppSelector } from "#ui/state/hooks.ts";
+import { selectProjectLayoutState } from "#ui/routes/project/$id/state/projectSlice.ts";
+import { useAppSelector } from "#ui/state/hooks.ts";
 import styles from "./ProjectPreviewLayout.module.css";
+import { useMergedRefs } from "@base-ui/utils/useMergedRefs";
+import { classes } from "#ui/classes.ts";
+
+const subscribeToFocus = (onStoreChange: () => void) => {
+	window.addEventListener("focusin", onStoreChange);
+	window.addEventListener("focusout", onStoreChange);
+
+	return () => {
+		window.removeEventListener("focusin", onStoreChange);
+		window.removeEventListener("focusout", onStoreChange);
+	};
+};
+
+const getFocusedProjectPanel = () =>
+	(document.activeElement?.closest("[data-panel]")?.id as PanelType | undefined) ?? null;
+
+export const useFocusedProjectPanel = (): PanelType | null => {
+	const getSnapshot = () => getFocusedProjectPanel();
+	return useSyncExternalStore(subscribeToFocus, getSnapshot, () => null);
+};
+
+export const useProjectPanelFocusManager = () => {
+	const panelElementsRef = useRef(new Map<PanelType, HTMLDivElement>());
+	const panelElementRef =
+		(panel: PanelType) =>
+		(element: HTMLDivElement | null): void => {
+			if (element) panelElementsRef.current.set(panel, element);
+			else panelElementsRef.current.delete(panel);
+		};
+	const focusPanel = (panel: PanelType) => {
+		panelElementsRef.current.get(panel)?.focus({ focusVisible: false });
+	};
+	const focusAdjacentPanel = (offset: -1 | 1) => {
+		const currentPanel = getFocusedProjectPanel();
+		if (currentPanel === null) return;
+		const nextPanel = orderedPanels[orderedPanels.indexOf(currentPanel) + offset];
+		if (nextPanel === undefined) return;
+		focusPanel(nextPanel);
+	};
+
+	return {
+		focusAdjacentPanel,
+		focusPanel,
+		panelElementRef,
+	};
+};
 
 export const ProjectPreviewLayout: FC<{
 	projectId: string;
+	activeDescendantId?: string;
 	children: ReactNode;
 	preview: ReactNode | null;
-}> = ({ children, projectId, preview }) => {
-	const dispatch = useAppDispatch();
+	panelElementRef: (panel: PanelType) => (element: HTMLDivElement | null) => void;
+}> = ({ activeDescendantId, children, panelElementRef, projectId, preview }) => {
 	const layoutState = useAppSelector((state) => selectProjectLayoutState(state, projectId));
 	const panelIds = getVisiblePanels(layoutState);
-	const focus = getFocus(layoutState);
-	const focusPrimary = () => dispatch(projectActions.focusPrimary({ projectId }));
-	const focusPreview = () => dispatch(projectActions.focusPreview({ projectId }));
 	const { defaultLayout, onLayoutChanged } = useDefaultLayout({
 		id: `project:${projectId}:layout`,
 		panelIds,
@@ -39,12 +79,13 @@ export const ProjectPreviewLayout: FC<{
 			<Panel
 				id={"primary" satisfies PanelType}
 				minSize={400}
-				onPointerDown={focusPrimary}
-				className={classes(
-					styles.panel,
-					styles.primaryPanel,
-					focus === "primary" && styles.focusedPanel,
+				elementRef={useMergedRefs(panelElementRef("primary"), (el) =>
+					el?.focus({ focusVisible: false }),
 				)}
+				tabIndex={0}
+				role="tree"
+				aria-activedescendant={activeDescendantId}
+				className={classes(styles.panel, styles.primaryPanel)}
 			>
 				{children}
 			</Panel>
@@ -55,12 +96,9 @@ export const ProjectPreviewLayout: FC<{
 						id={"preview" satisfies PanelType}
 						minSize={300}
 						defaultSize="70%"
-						onPointerDown={focusPreview}
-						className={classes(
-							styles.panel,
-							styles.previewPanel,
-							focus === "preview" && styles.focusedPanel,
-						)}
+						elementRef={panelElementRef("preview")}
+						tabIndex={0}
+						className={classes(styles.panel, styles.previewPanel)}
 					>
 						{preview}
 					</Panel>

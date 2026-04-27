@@ -664,8 +664,11 @@ fn id_for_tree_diff(
     let mut state = Default::default();
     let mut delegate = Delegate::default();
     gix::diff::tree(
-        gix::objs::TreeRefIter::from_bytes(&lhs_tree.unwrap_or(empty_tree).data),
-        gix::objs::TreeRefIter::from_bytes(&rhs_tree.data),
+        gix::objs::TreeRefIter::from_bytes(
+            &lhs_tree.unwrap_or(empty_tree).data,
+            repo.object_hash(),
+        ),
+        gix::objs::TreeRefIter::from_bytes(&rhs_tree.data, repo.object_hash()),
         &mut state,
         repo.objects.deref(),
         &mut delegate,

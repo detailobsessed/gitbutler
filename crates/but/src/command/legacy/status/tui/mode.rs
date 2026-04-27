@@ -10,7 +10,7 @@ use crate::{
     CliId,
     command::legacy::status::tui::MessageOnDrop,
     id::{ShortId, UncommittedCliId},
-    theme,
+    theme::Theme,
 };
 
 #[derive(Debug, Default, strum::EnumDiscriminants)]
@@ -28,34 +28,30 @@ pub(super) enum Mode {
 }
 
 impl Mode {
-    pub(super) fn bg(&self) -> Color {
-        let t = theme::get();
-
+    pub(super) fn bg(&self, theme: &'static Theme) -> Color {
         match self {
-            Mode::Normal => t.tui_mode_normal.bg.unwrap_or(Color::DarkGray),
-            Mode::Commit(_) => t.tui_mode_commit.bg.unwrap_or(Color::Green),
-            Mode::Rub(_) => t.tui_mode_rub.bg.unwrap_or(Color::Blue),
-            Mode::InlineReword(_) => t.tui_mode_inline_reword.bg.unwrap_or(Color::Magenta),
-            Mode::Command(_) => t.tui_mode_command.bg.unwrap_or(Color::Yellow),
-            Mode::Move(..) => t.tui_mode_move.bg.unwrap_or(Color::Cyan),
-            Mode::Details => t
+            Mode::Normal => theme.tui_mode_normal.bg.unwrap_or(Color::DarkGray),
+            Mode::Commit(_) => theme.tui_mode_commit.bg.unwrap_or(Color::Green),
+            Mode::Rub(_) => theme.tui_mode_rub.bg.unwrap_or(Color::Blue),
+            Mode::InlineReword(_) => theme.tui_mode_inline_reword.bg.unwrap_or(Color::Magenta),
+            Mode::Command(_) => theme.tui_mode_command.bg.unwrap_or(Color::Yellow),
+            Mode::Move(..) => theme.tui_mode_move.bg.unwrap_or(Color::Cyan),
+            Mode::Details => theme
                 .tui_mode_details
                 .bg
                 .unwrap_or(Color::Rgb(255, 165, 0) /* orange */),
         }
     }
 
-    pub(super) fn fg(&self) -> Color {
-        let t = theme::get();
-
+    pub(super) fn fg(&self, theme: &'static Theme) -> Color {
         match self {
-            Mode::Normal => t.tui_mode_normal.fg.unwrap_or(Color::White),
-            Mode::Commit(_) => t.tui_mode_commit.fg.unwrap_or(Color::Black),
-            Mode::Rub(_) => t.tui_mode_rub.fg.unwrap_or(Color::Black),
-            Mode::InlineReword(_) => t.tui_mode_inline_reword.fg.unwrap_or(Color::Black),
-            Mode::Command(_) => t.tui_mode_command.fg.unwrap_or(Color::Black),
-            Mode::Move(..) => t.tui_mode_move.fg.unwrap_or(Color::Black),
-            Mode::Details => t.tui_mode_details.fg.unwrap_or(Color::Black),
+            Mode::Normal => theme.tui_mode_normal.fg.unwrap_or(Color::White),
+            Mode::Commit(_) => theme.tui_mode_commit.fg.unwrap_or(Color::Black),
+            Mode::Rub(_) => theme.tui_mode_rub.fg.unwrap_or(Color::Black),
+            Mode::InlineReword(_) => theme.tui_mode_inline_reword.fg.unwrap_or(Color::Black),
+            Mode::Command(_) => theme.tui_mode_command.fg.unwrap_or(Color::Black),
+            Mode::Move(..) => theme.tui_mode_move.fg.unwrap_or(Color::Black),
+            Mode::Details => theme.tui_mode_details.fg.unwrap_or(Color::Black),
         }
     }
 }

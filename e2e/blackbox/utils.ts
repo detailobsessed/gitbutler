@@ -16,6 +16,12 @@ export async function findAndClick(selector: string) {
 	await element.click();
 }
 
+export async function findElement(selector: string) {
+	const element = $(selector);
+	await element.waitForExist({ timeout: 15000 });
+	return await element.getElement();
+}
+
 export async function setElementValue(targetElement: WebdriverIO.Element, value: string) {
 	await browser.execute(
 		(input, path) => {

@@ -14,8 +14,9 @@ pub use remote::GitRemote;
 mod repository_ext;
 pub use repository_ext::{commit_with_signature_gix, commit_without_signature_gix};
 
+pub use but_hooks::hook_manager;
 pub mod hooks;
-pub mod managed_hooks;
+pub use but_hooks::managed_hooks;
 mod remote;
 pub mod staging;
 
@@ -34,18 +35,9 @@ pub fn signature_gix(purpose: SignaturePurpose) -> gix::actor::Signature {
     gix::actor::Signature {
         name: GITBUTLER_COMMIT_AUTHOR_NAME.into(),
         email: GITBUTLER_COMMIT_AUTHOR_EMAIL.into(),
-        time: commit_time(match purpose {
+        time: but_core::commit_time(match purpose {
             SignaturePurpose::Author => "GIT_AUTHOR_DATE",
             SignaturePurpose::Committer => "GIT_COMMITTER_DATE",
         }),
     }
-}
-
-/// Return the time of a commit as `now` unless the `overriding_variable_name` contains a parseable date,
-/// which is used instead.
-fn commit_time(overriding_variable_name: &str) -> gix::date::Time {
-    std::env::var(overriding_variable_name)
-        .ok()
-        .and_then(|time| gix::date::parse(&time, Some(std::time::SystemTime::now())).ok())
-        .unwrap_or_else(gix::date::Time::now_local_or_utc)
 }

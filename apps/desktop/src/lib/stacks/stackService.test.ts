@@ -30,7 +30,7 @@ function makeMockUiState(initialSelection: StackSelection | undefined): {
 describe("StackService.uncommit", () => {
 	test("clears the selected commit after a successful uncommit", async () => {
 		const mutate = vi.fn().mockResolvedValue({
-			undoneCommit: "commit-1",
+			uncommittedIds: ["commit-1"],
 			workspace: {
 				headInfo: {
 					reference: "refs/heads/branch",
@@ -56,13 +56,13 @@ describe("StackService.uncommit", () => {
 		await service.uncommit({
 			projectId: "project-1",
 			stackId: "stack-1",
-			commitId: "commit-1",
+			commitIds: ["commit-1"],
 		});
 
 		expect(mutate).toHaveBeenCalledWith({
 			projectId: "project-1",
 			stackId: "stack-1",
-			commitId: "commit-1",
+			commitIds: ["commit-1"],
 		});
 		expect(getSelection()).toBeUndefined();
 	});

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use but_rebase::graph_rebase::Editor;
 use but_testsupport::{graph_workspace, visualize_commit_graph_all};
-use but_workspace::commit::discard_commit;
+use but_workspace::commit::discard_commits;
 
 use crate::ref_info::with_workspace_commit::utils::{
     StackState, add_stack_with_segments, named_writable_scenario_with_description_and_graph,
@@ -24,7 +24,7 @@ fn discard_middle_commit_in_non_managed_workspace() -> Result<()> {
 
     let mut ws = graph.into_workspace()?;
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
-    let outcome = discard_commit(editor, two)?;
+    let outcome = discard_commits(editor, [two.detach()])?;
 
     outcome.materialize()?;
 
@@ -99,7 +99,7 @@ fn discard_tip_commit_in_workspace_stack() -> Result<()> {
             └── ·09d8e52 (🏘️)
     ");
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
-    let outcome = discard_commit(editor, c)?;
+    let outcome = discard_commits(editor, [c.detach()])?;
 
     let outcome = outcome.materialize()?;
     insta::assert_snapshot!(graph_workspace(outcome.workspace), @"
@@ -166,7 +166,7 @@ fn discard_bottom_commit_in_workspace_stack() -> Result<()> {
             └── ·09d8e52 (🏘️)
     ");
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
-    let outcome = discard_commit(editor, b)?;
+    let outcome = discard_commits(editor, [b.detach()])?;
 
     let outcome = outcome.materialize()?;
     insta::assert_snapshot!(graph_workspace(outcome.workspace), @"
@@ -221,12 +221,11 @@ fn cannot_discard_conflicted_commit() -> Result<()> {
 
     let mut ws = graph.into_workspace()?;
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
-    let result = discard_commit(editor, conflicted);
+    let result = discard_commits(editor, [conflicted.detach()]);
 
     let err = result.expect_err("Discarding a conflicted commit must fail");
     assert!(
-        err.to_string()
-            .contains("Cannot discard a conflicted commit"),
+        err.to_string().contains("Cannot discard conflicted commit"),
         "unexpected error: {err}"
     );
 
@@ -234,6 +233,100 @@ fn cannot_discard_conflicted_commit() -> Result<()> {
     * 8450331 (HEAD -> main, tag: conflicted) GitButler WIP Commit
     * a047f81 (tag: normal) init
     ");
+
+    Ok(())
+}
+
+#[test]
+fn discard_multiple_commits_in_single_rebase() -> Result<()> {
+    let (_tmp, graph, repo, mut meta, _description) =
+        named_writable_scenario_with_description_and_graph("reword-three-commits", |_| {})?;
+
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
+    * c9f444c (HEAD -> three) commit three
+    * 16fd221 (origin/two, two) commit two
+    * 8b426d0 (one) commit one
+    ");
+
+    let one = repo.rev_parse_single("one")?;
+    let two = repo.rev_parse_single("two")?;
+    let three = repo.rev_parse_single("three")?;
+
+    let mut ws = graph.into_workspace()?;
+    let editor = Editor::create(&mut ws, &mut meta, &repo)?;
+    // Discard both two and three in a single operation.
+    let outcome = discard_commits(editor, [two.into(), three.into()])?;
+
+    outcome.materialize()?;
+
+    let tip_of_two = repo.rev_parse_single("two")?;
+    assert_eq!(tip_of_two, one, "two should now point to one");
+
+    let tip_of_three = repo.rev_parse_single("three")?;
+    assert_eq!(tip_of_three, one, "three should also point to one");
+
+    // Only one.txt should remain — two.txt and three.txt were introduced
+    // by the discarded commits and should be removed from the tree.
+    assert!(
+        repo.rev_parse_single(format!("{tip_of_three}:one.txt").as_str())
+            .is_ok()
+    );
+    assert!(
+        repo.rev_parse_single(format!("{tip_of_three}:two.txt").as_str())
+            .is_err(),
+        "two.txt should be gone after discarding commit two"
+    );
+    assert!(
+        repo.rev_parse_single(format!("{tip_of_three}:three.txt").as_str())
+            .is_err(),
+        "three.txt should be gone after discarding commit three"
+    );
+
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
+    * 16fd221 (origin/two) commit two
+    * 8b426d0 (HEAD -> three, two, one) commit one
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn discard_both_commits_in_workspace_stack() -> Result<()> {
+    let (_tmp, graph, repo, mut meta, _description) =
+        named_writable_scenario_with_description_and_graph(
+            "ws-ref-ws-commit-single-stack-double-stack",
+            |meta| {
+                add_stack_with_segments(meta, 1, "A", StackState::InWorkspace, &[]);
+                add_stack_with_segments(meta, 2, "C", StackState::InWorkspace, &["B"]);
+            },
+        )?;
+
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
+    *   f3e1bf2 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    |\  
+    | * 09d8e52 (A) A
+    * | 09bc93e (C) C
+    * | c813d8d (B) B
+    |/  
+    * 85efbe4 (origin/main, main) M
+    ");
+
+    let b = repo.rev_parse_single("B")?;
+    let c = repo.rev_parse_single("C")?;
+    let main = repo.rev_parse_single("main")?;
+
+    let mut ws = graph.into_workspace()?;
+    let editor = Editor::create(&mut ws, &mut meta, &repo)?;
+    // Discard both B and C in one rebase.
+    let outcome = discard_commits(editor, [b.into(), c.into()])?;
+
+    outcome.materialize()?;
+
+    let tip_of_b = repo.rev_parse_single("B")?;
+    assert_eq!(tip_of_b, main, "B should now point to main");
+
+    let tip_of_c = repo.rev_parse_single("C")?;
+    assert_eq!(tip_of_c, main, "C should also point to main");
 
     Ok(())
 }

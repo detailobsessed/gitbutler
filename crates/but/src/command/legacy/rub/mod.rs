@@ -4,7 +4,7 @@ use crate::theme::{self, Paint};
 use anyhow::{Context as _, bail};
 use bstr::BStr;
 use but_api::commit::types::{
-    CommitCreateResult, CommitMoveResult, CommitSquashResult, CommitUndoResult, MoveChangesResult,
+    CommitCreateResult, CommitMoveResult, CommitSquashResult, MoveChangesResult, UncommitResult,
 };
 use but_core::{DiffSpec, DryRun, ref_metadata::StackId, sync::RepoExclusive};
 use but_ctx::Context;
@@ -598,8 +598,8 @@ impl CommitToUnassignedOperation {
     }
 
     /// Executes `UndoCommit` by uncommitting all changes from the selected commit.
-    pub(crate) fn execute_inner(&self, ctx: &mut Context) -> anyhow::Result<CommitUndoResult> {
-        but_api::commit::undo::commit_undo(ctx, self.oid, None, DryRun::No)
+    pub(crate) fn execute_inner(&self, ctx: &mut Context) -> anyhow::Result<UncommitResult> {
+        but_api::commit::uncommit::commit_uncommit(ctx, vec![self.oid], None, DryRun::No)
     }
 }
 
@@ -624,9 +624,14 @@ impl CommitToStackOperation {
         Ok(())
     }
 
-    /// Executes `UndoCommit` by uncommitting all changes from the selected commit.
-    pub(crate) fn execute_inner(&self, ctx: &mut Context) -> anyhow::Result<CommitUndoResult> {
-        but_api::commit::undo::commit_undo(ctx, self.oid, Some(self.stack), DryRun::No)
+    /// Uncommits all changes from the selected commit to the given stack.
+    pub(crate) fn execute_inner(&self, ctx: &mut Context) -> anyhow::Result<UncommitResult> {
+        but_api::commit::uncommit::commit_uncommit(
+            ctx,
+            vec![self.oid],
+            Some(self.stack),
+            DryRun::No,
+        )
     }
 }
 

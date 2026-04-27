@@ -134,7 +134,7 @@
 				await stackService.uncommit({
 					projectId,
 					stackId: targetStackId,
-					commitId: commitKey.commitId,
+					commitIds: [commitKey.commitId],
 				});
 			},
 		);

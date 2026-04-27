@@ -183,7 +183,7 @@
 			await stackService.uncommit({
 				projectId,
 				stackId: targetStackId,
-				commitId,
+				commitIds: [commitId],
 			});
 		});
 	}
@@ -193,21 +193,17 @@
 		const commitIds = selectedIds ?? controller.selectedCommitIds;
 		if (commitIds.length === 0) return;
 
-		// Uncommit from top to bottom so each undo removes a leaf commit.
 		// Filter to only IDs present in this branch to avoid invalid operations.
 		const allIds = getAllCommitIds();
-		const sorted = commitIds
-			.filter((id) => allIds.includes(id))
-			.sort((a, b) => allIds.indexOf(a) - allIds.indexOf(b));
+		const filtered = commitIds.filter((id) => allIds.includes(id));
+		if (filtered.length === 0) return;
 
 		await withStackBusy(uiState, projectId, { stackIds: [targetStackId] }, async () => {
-			for (const id of sorted) {
-				await stackService.uncommit({
-					projectId,
-					stackId: targetStackId,
-					commitId: id,
-				});
-			}
+			await stackService.uncommit({
+				projectId,
+				stackId: targetStackId,
+				commitIds: filtered,
+			});
 		});
 		controller.selection.set(undefined);
 	}

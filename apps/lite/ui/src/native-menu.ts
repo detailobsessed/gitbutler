@@ -62,7 +62,7 @@ const getBottomLeft = (element: HTMLElement): NativeMenuPosition => {
 };
 
 export const showNativeContextMenu = async (
-	event: MouseEvent<HTMLButtonElement>,
+	event: MouseEvent<HTMLElement>,
 	items: Array<NativeMenuItem>,
 ): Promise<void> => {
 	event.preventDefault();

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     commit::types::CommitDiscardResult as EngineCommitDiscardResult,
-    commit::types::CommitUndoResult as EngineCommitUndoResult, json::HexHash,
+    commit::types::UncommitResult as EngineUncommitResult, json::HexHash,
 };
 
 use super::types::{
@@ -246,32 +246,32 @@ impl TryFrom<EngineCommitDiscardResult> for CommitDiscardResult {
     }
 }
 
-/// JSON transport type for undoing a commit.
+/// JSON transport type for uncommitting one or more commits.
 #[derive(Debug, Serialize)]
 #[cfg_attr(feature = "export-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
-pub struct CommitUndoResult {
-    /// The ID of the commit that was undone.
-    #[cfg_attr(feature = "export-schema", schemars(with = "String"))]
-    pub undone_commit: HexHash,
-    /// Workspace state after undoing the commit.
+pub struct UncommitResult {
+    /// The IDs of the commits that were uncommitted.
+    #[cfg_attr(feature = "export-schema", schemars(with = "Vec<String>"))]
+    pub uncommitted_ids: Vec<HexHash>,
+    /// Workspace state after uncommitting.
     pub workspace: crate::json::WorkspaceState,
 }
 
 #[cfg(feature = "export-schema")]
-but_schemars::register_sdk_type!(CommitUndoResult);
+but_schemars::register_sdk_type!(UncommitResult);
 
-impl TryFrom<EngineCommitUndoResult> for CommitUndoResult {
+impl TryFrom<EngineUncommitResult> for UncommitResult {
     type Error = anyhow::Error;
 
-    fn try_from(value: EngineCommitUndoResult) -> Result<Self, Self::Error> {
-        let EngineCommitUndoResult {
-            undone_commit,
+    fn try_from(value: EngineUncommitResult) -> Result<Self, Self::Error> {
+        let EngineUncommitResult {
+            uncommitted_ids,
             workspace,
         } = value;
 
         Ok(Self {
-            undone_commit: undone_commit.into(),
+            uncommitted_ids: uncommitted_ids.into_iter().map(Into::into).collect(),
             workspace: workspace.try_into()?,
         })
     }

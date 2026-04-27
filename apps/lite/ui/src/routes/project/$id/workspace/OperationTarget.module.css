@@ -15,6 +15,8 @@
 .insertionTarget {
 	--indicator-height: 3px;
 
+	/* Ensure outset outline appears above siblings. */
+	z-index: 1;
 	position: absolute;
 	height: var(--indicator-height);
 	inset-inline: 0;

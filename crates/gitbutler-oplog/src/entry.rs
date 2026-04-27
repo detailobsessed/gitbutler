@@ -53,6 +53,12 @@ impl SnapshotDetails {
             trailers: vec![],
         }
     }
+    pub fn with_count(mut self, count: usize) -> Self {
+        if count > 1 {
+            self.title = format!("{} ({})", self.title, count);
+        }
+        self
+    }
     pub fn with_trailers(mut self, trailers: Vec<Trailer>) -> Self {
         self.trailers = trailers;
         self

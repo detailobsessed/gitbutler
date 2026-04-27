@@ -540,7 +540,7 @@ fn main() -> anyhow::Result<()> {
                 commit::move_commit::tauri_commit_move::commit_move,
                 commit::move_changes::tauri_commit_move_changes_between::commit_move_changes_between,
                 commit::uncommit::tauri_commit_uncommit_changes::commit_uncommit_changes,
-                commit::undo::tauri_commit_undo::commit_undo,
+                commit::uncommit::tauri_commit_uncommit::commit_uncommit,
                 platform::tauri_build_type::build_type,
             ])
             .menu(move |handle| menu::build(handle, &app_settings_for_menu))

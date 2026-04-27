@@ -32,7 +32,7 @@ use std::{fmt::Display, path::Path, sync::OnceLock};
 use colored::{ColoredString, Colorize as _};
 use ratatui::{
     palette::Hsl,
-    style::{Color, Modifier, Style},
+    style::{Color, Modifier, Style, Styled},
     text::Span,
 };
 use serde::{Deserialize, Serialize};
@@ -541,6 +541,32 @@ impl StyledSymbol {
 impl Display for StyledSymbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.style.paint(&self.content))
+    }
+}
+
+/// Combine the styling of an item with another style.
+///
+/// Doing `widget.style(new_style)` will fully replace `widget`'s styling. This method however will
+/// combine the styles using [`Style::patch`].
+///
+/// This is useful if you have an already styled widget and you want to add for example a
+/// background color to indicate that it is selected. Doing that with
+/// `widget.style(bg_highlight_style)` would replace any existing style on `widget`.
+pub trait PatchStyle {
+    type Item;
+
+    fn patch_style(self, new_style: Style) -> Self::Item;
+}
+
+impl<T> PatchStyle for T
+where
+    T: Styled,
+{
+    type Item = T::Item;
+
+    fn patch_style(self, new_style: Style) -> Self::Item {
+        let style = self.style();
+        self.set_style(new_style.patch(style))
     }
 }
 

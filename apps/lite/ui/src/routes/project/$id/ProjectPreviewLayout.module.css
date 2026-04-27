@@ -20,10 +20,10 @@
 
 .panel {
 	border-top: 2px solid transparent;
-}
 
-.focusedPanel {
-	border-top-color: var(--color-black);
+	[data-panel]:focus-within & {
+		border-top-color: var(--color-black);
+	}
 }
 
 .previewResizeHandle {

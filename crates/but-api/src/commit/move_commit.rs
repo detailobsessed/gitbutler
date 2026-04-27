@@ -159,7 +159,7 @@ pub fn commit_move_with_perm(
 ) -> anyhow::Result<CommitMoveResult> {
     let maybe_oplog_entry = but_oplog::UnmaterializedOplogSnapshot::from_details_with_perm(
         ctx,
-        SnapshotDetails::new(OperationKind::MoveCommit),
+        SnapshotDetails::new(OperationKind::MoveCommit).with_count(subject_commit_ids.len()),
         perm.read_permission(),
         dry_run,
     );

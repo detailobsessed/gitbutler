@@ -44,49 +44,41 @@ const projectSlice = createSlice({
 		selectItem: (state, action: PayloadAction<{ projectId: string; item: Item | null }>) => {
 			const { projectId, item } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			layout.focusPrimary(projectState.layout);
 			workspace.selectItem(projectState.workspace, item);
 		},
 		startRewordCommit: (state, action: PayloadAction<{ projectId: string; item: CommitItem }>) => {
 			const { projectId, item } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			layout.focusPrimary(projectState.layout);
 			workspace.startRewordCommit(projectState.workspace, item);
 		},
 		startRenameBranch: (state, action: PayloadAction<{ projectId: string; item: BranchItem }>) => {
 			const { projectId, item } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			layout.focusPrimary(projectState.layout);
 			workspace.startRenameBranch(projectState.workspace, item);
 		},
 		openCommitFiles: (state, action: PayloadAction<{ projectId: string; item: CommitItem }>) => {
 			const { projectId, item } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			layout.focusPrimary(projectState.layout);
 			workspace.openCommitFiles(projectState.workspace, item);
 		},
-		closeCommitFiles: (state, action: PayloadAction<{ projectId: string; item: CommitItem }>) => {
-			const { projectId, item } = action.payload;
+		closeCommitFiles: (state, action: PayloadAction<{ projectId: string }>) => {
+			const { projectId } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			layout.focusPrimary(projectState.layout);
-			workspace.closeCommitFiles(projectState.workspace, item);
+			workspace.closeCommitFiles(projectState.workspace);
 		},
 		toggleCommitFiles: (state, action: PayloadAction<{ projectId: string; item: CommitItem }>) => {
 			const { projectId, item } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			layout.focusPrimary(projectState.layout);
 			workspace.toggleCommitFiles(projectState.workspace, item);
 		},
 		enterRubMode: (state, action: PayloadAction<{ projectId: string; source: Item }>) => {
 			const { projectId, source } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			layout.focusPrimary(projectState.layout);
 			workspace.enterRubMode(projectState.workspace, source);
 		},
 		enterMoveMode: (state, action: PayloadAction<{ projectId: string; source: Item }>) => {
 			const { projectId, source } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			layout.focusPrimary(projectState.layout);
 			workspace.enterMoveMode(projectState.workspace, source);
 		},
 		enterDragAndDropMode: (
@@ -98,7 +90,6 @@ const projectSlice = createSlice({
 		) => {
 			const { projectId, source } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			layout.focusPrimary(projectState.layout);
 			workspace.enterDragAndDropMode(projectState.workspace, source);
 		},
 		updateDragAndDropMode: (
@@ -128,18 +119,6 @@ const projectSlice = createSlice({
 		) => {
 			const { projectId, commitIds } = action.payload;
 			workspace.setHighlightedCommitIds(ensureProjectState(state, projectId).workspace, commitIds);
-		},
-		focusPrimary: (state, action: PayloadAction<{ projectId: string }>) => {
-			layout.focusPrimary(ensureProjectState(state, action.payload.projectId).layout);
-		},
-		focusPreview: (state, action: PayloadAction<{ projectId: string }>) => {
-			layout.focusPreview(ensureProjectState(state, action.payload.projectId).layout);
-		},
-		focusPreviousPanel: (state, action: PayloadAction<{ projectId: string }>) => {
-			layout.focusPreviousPanel(ensureProjectState(state, action.payload.projectId).layout);
-		},
-		focusNextPanel: (state, action: PayloadAction<{ projectId: string }>) => {
-			layout.focusNextPanel(ensureProjectState(state, action.payload.projectId).layout);
 		},
 		closePreview: (state, action: PayloadAction<{ projectId: string }>) => {
 			layout.closePreview(ensureProjectState(state, action.payload.projectId).layout);

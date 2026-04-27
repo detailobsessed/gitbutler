@@ -62,7 +62,7 @@ impl GitHubAccount {
         match self {
             GitHubAccount::OAuth { username, .. } => username,
             GitHubAccount::Pat { username, .. } => username,
-            GitHubAccount::Enterprise { host, .. } => host,
+            GitHubAccount::Enterprise { username, .. } => username,
         }
     }
 }
@@ -154,7 +154,7 @@ impl GitLabAccount {
     pub fn username(&self) -> &str {
         match self {
             GitLabAccount::Pat { username, .. } => username,
-            GitLabAccount::SelfHosted { host, .. } => host,
+            GitLabAccount::SelfHosted { username, .. } => username,
         }
     }
 }

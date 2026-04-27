@@ -63,7 +63,7 @@ use crate::{
         },
     },
     id::UNASSIGNED,
-    theme::{self, Theme},
+    theme::Theme,
     tui::{CrosstermTerminalGuard, HeadlessTerminalGuard, TerminalGuard},
     utils::{DebugAsType, OutputChannel, binary_path::current_exe_for_but_exec},
 };
@@ -396,13 +396,13 @@ impl App {
             Cursor::new(&status_lines)
         };
 
-        let details = if options.show_diff {
-            Details::new_visible()
-        } else {
-            Details::new_hidden()
-        };
-
         let theme = crate::theme::get();
+
+        let details = if options.show_diff {
+            Details::new_visible(theme)
+        } else {
+            Details::new_hidden(theme)
+        };
 
         Self {
             status_lines,
@@ -639,6 +639,20 @@ impl App {
                     self.cursor = new_cursor;
                 }
             }
+            Message::SelectMergeBase => {
+                let Some(new_cursor) = Cursor::select_merge_base(&self.status_lines) else {
+                    return Ok(());
+                };
+                if let Some(merge_base_line) = new_cursor.selected_line(&self.status_lines)
+                    && cursor::is_selectable_in_mode(
+                        merge_base_line,
+                        &self.mode,
+                        self.flags.show_files,
+                    )
+                {
+                    self.cursor = new_cursor;
+                }
+            }
             Message::Rub(rub_message) => match rub_message {
                 RubMessage::Start => self.handle_start_rub(),
                 RubMessage::StartWithSource {
@@ -740,7 +754,7 @@ impl App {
                 self.details
                     .try_handle_message(details_message, details_viewport, messages)?;
             }
-            Message::RegisterMessageOnDrop(rx) => {
+            Message::RegisterOutOfBandMessage(rx) => {
                 self.incoming_out_of_band_messages.push(rx);
             }
             Message::WithOneFrameDelay(msg) => {
@@ -1201,12 +1215,16 @@ impl App {
                 self.to_be_discarded = Some(Arc::clone(cli_id));
                 let drop_to_be_discarded =
                     message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
-                Confirm::new("Discard unassigned changes?", move |ctx, messages| {
-                    operations::discard_unassigned_legacy(ctx)?;
-                    messages.push(Message::Reload(Some(SelectAfterReload::Unassigned)));
-                    drop(drop_to_be_discarded);
-                    Ok(())
-                })
+                Confirm::new(
+                    "Discard unassigned changes?",
+                    self.theme,
+                    move |ctx, messages| {
+                        operations::discard_unassigned_legacy(ctx)?;
+                        messages.push(Message::Reload(Some(SelectAfterReload::Unassigned)));
+                        drop(drop_to_be_discarded);
+                        Ok(())
+                    },
+                )
             }
             CliId::Uncommitted(uncommitted) => {
                 self.to_be_discarded = Some(Arc::clone(cli_id));
@@ -1234,6 +1252,7 @@ impl App {
                     message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
                 Confirm::new(
                     format!("Discard {}?", uncommitted.describe()),
+                    self.theme,
                     move |ctx, messages| {
                         let hunk_assignments = uncommitted
                             .hunk_assignments
@@ -1257,6 +1276,7 @@ impl App {
                     message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
                 Confirm::new(
                     "Discard staged changes in this stack?",
+                    self.theme,
                     move |ctx, messages| {
                         operations::discard_stack(ctx, stack_id)?;
                         messages.push(Message::Reload(Some(select_after_reload)));
@@ -1275,6 +1295,7 @@ impl App {
                     message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
                 Confirm::new(
                     format!("Discard commit {}?", commit_id.to_hex_with_len(7)),
+                    self.theme,
                     move |ctx, messages| {
                         let discard_result = operations::commit_discard(ctx, commit_id)?;
                         let select_after_reload =
@@ -1308,12 +1329,16 @@ impl App {
                     .select_after_discarded_branch(&self.status_lines);
                 let drop_to_be_discarded =
                     message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
-                Confirm::new(format!("Discard branch {name}?"), move |ctx, messages| {
-                    operations::remove_branch_legacy(ctx, stack_id, name)?;
-                    messages.push(Message::Reload(select_after_reload));
-                    drop(drop_to_be_discarded);
-                    Ok(())
-                })
+                Confirm::new(
+                    format!("Discard branch {name}?"),
+                    self.theme,
+                    move |ctx, messages| {
+                        operations::remove_branch_legacy(ctx, stack_id, name)?;
+                        messages.push(Message::Reload(select_after_reload));
+                        drop(drop_to_be_discarded);
+                        Ok(())
+                    },
+                )
             }
             CliId::PathPrefix { .. } | CliId::CommittedFile { .. } => return,
         });
@@ -1898,15 +1923,13 @@ impl App {
             return Ok(());
         };
 
-        let t = theme::get();
-
         let inline_reword_mode = match &**cli_id {
             CliId::Branch { name, stack_id, .. } => {
                 let Some(stack_id) = stack_id else {
                     return Ok(());
                 };
                 let mut textarea = TextArea::from([name]);
-                textarea.set_cursor_line_style(t.local_branch);
+                textarea.set_cursor_line_style(self.theme.local_branch);
                 textarea.move_cursor(CursorMove::End);
 
                 InlineRewordMode::Branch {
@@ -1925,7 +1948,7 @@ impl App {
 
                 let first_line = current_message.lines().next().unwrap_or("").to_string();
                 let mut textarea = TextArea::from([first_line]);
-                textarea.set_cursor_line_style(t.default);
+                textarea.set_cursor_line_style(self.theme.default);
                 textarea.move_cursor(CursorMove::End);
 
                 InlineRewordMode::Commit {
@@ -2078,7 +2101,7 @@ impl App {
 
     fn handle_enter_command_mode(&mut self, kind: CommandModeKind) {
         let mut textarea = TextArea::default();
-        textarea.set_cursor_line_style(theme::get().default);
+        textarea.set_cursor_line_style(self.theme.default);
         textarea.move_cursor(CursorMove::End);
 
         self.mode = Mode::Command(CommandMode {
@@ -2189,8 +2212,6 @@ impl App {
     }
 
     fn render(&self, frame: &mut Frame) {
-        let t = theme::get();
-
         let content_layout =
             Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).split(frame.area());
         let main_content_area = content_layout[0];
@@ -2209,11 +2230,11 @@ impl App {
         let status_layout = self.status_layout(main_content_area);
 
         let dimmed_block = Block::bordered()
-            .border_style(t.border)
+            .border_style(self.theme.border)
             .border_type(BorderType::Plain)
             .borders(Borders::BOTTOM);
         let focused_block = Block::bordered()
-            .border_style(t.default.fg(self.mode.bg()))
+            .border_style(self.theme.default.fg(self.mode.bg(self.theme)))
             .border_type(BorderType::Thick)
             .borders(Borders::BOTTOM);
 
@@ -2237,7 +2258,7 @@ impl App {
 
         if let Some(debug_area) = debug_area {
             let outer_block = Block::bordered()
-                .border_style(t.border)
+                .border_style(self.theme.border)
                 .border_type(BorderType::Thick)
                 .borders(Borders::LEFT);
             let inner_area = outer_block.inner(debug_area);
@@ -2246,6 +2267,21 @@ impl App {
         }
 
         self.render_hotbar(hotbar_area, frame);
+
+        self.render_toasts(
+            status_layout
+                .details_area
+                .unwrap_or(status_layout.status_area),
+            frame,
+        );
+
+        if let Some(confirm) = &self.confirm {
+            confirm.render(frame.area(), frame);
+        }
+
+        if let Some(branch_picker) = &self.branch_picker {
+            branch_picker.render(frame.area(), frame);
+        }
     }
 
     fn status_layout(&self, area: Rect) -> StatusLayout {
@@ -2283,16 +2319,6 @@ impl App {
         frame.render_widget(list, content_area);
 
         self.render_inline_reword(content_area, frame);
-
-        self.render_toasts(content_area, frame);
-
-        if let Some(confirm) = &self.confirm {
-            confirm.render(content_area, frame);
-        }
-
-        if let Some(branch_picker) = &self.branch_picker {
-            branch_picker.render(content_area, frame);
-        }
     }
 
     fn render_status_list_item(
@@ -2361,21 +2387,21 @@ impl App {
                     if let Some(cli_id) = data.cli_id()
                         && source == &**cli_id
                     {
-                        line.extend([source_span(), Span::raw(" ")]);
+                        line.extend([source_span(self.theme), Span::raw(" ")]);
                     }
                 }
                 Mode::Commit(CommitMode { source, .. }) => {
                     if let Some(cli_id) = data.cli_id()
                         && **source == **cli_id
                     {
-                        line.extend([source_span(), Span::raw(" ")]);
+                        line.extend([source_span(self.theme), Span::raw(" ")]);
                     }
                 }
                 Mode::Move(MoveMode { source, .. }) => {
                     if let Some(cli_id) = data.cli_id()
                         && **source == **cli_id
                     {
-                        line.extend([source_span(), Span::raw(" ")]);
+                        line.extend([source_span(self.theme), Span::raw(" ")]);
                     }
                 }
             }
@@ -2488,13 +2514,11 @@ impl App {
                     line.extend(
                         content_spans
                             .into_iter()
-                            .map(|span| span.style(theme::get().hint)),
+                            .map(|span| span.style(self.theme.hint)),
                     );
                 }
             }
         }
-
-        let t = theme::get();
 
         if is_selected {
             match &self.mode {
@@ -2502,7 +2526,8 @@ impl App {
                     if matches!(data, StatusOutputLineData::Commit { .. })
                         || matches!(data, StatusOutputLineData::Branch { .. })
                     {
-                        let mut extension_line = Line::default().style(t.selection_highlight);
+                        let mut extension_line =
+                            Line::default().style(self.theme.selection_highlight);
                         extend_connector_spans(
                             connector.as_deref().unwrap_or_default(),
                             ExtensionDirection::Below,
@@ -2520,7 +2545,8 @@ impl App {
                     if let StatusOutputLineData::Commit { cli_id: target, .. } = data
                         && *move_mode.source != **target
                     {
-                        let mut extension_line = Line::default().style(t.selection_highlight);
+                        let mut extension_line =
+                            Line::default().style(self.theme.selection_highlight);
                         extend_connector_spans(
                             connector.as_deref().unwrap_or_default(),
                             ExtensionDirection::Below,
@@ -2536,7 +2562,8 @@ impl App {
                         && *move_mode.source != **target
                     {
                         if move_mode.source.is_commit() {
-                            let mut extension_line = Line::default().style(t.selection_highlight);
+                            let mut extension_line =
+                                Line::default().style(self.theme.selection_highlight);
                             extend_connector_spans(
                                 connector.as_deref().unwrap_or_default(),
                                 ExtensionDirection::Below,
@@ -2549,7 +2576,8 @@ impl App {
                             );
                             return StatusListItem::Double(line, extension_line);
                         } else {
-                            let mut extension_line = Line::default().style(t.selection_highlight);
+                            let mut extension_line =
+                                Line::default().style(self.theme.selection_highlight);
                             extend_connector_spans(
                                 connector.as_deref().unwrap_or_default(),
                                 ExtensionDirection::Above,
@@ -2573,7 +2601,7 @@ impl App {
         }
 
         if is_selected {
-            line = line.style(t.selection_highlight);
+            line = line.style(self.theme.selection_highlight);
         }
 
         StatusListItem::Single(line)
@@ -2590,7 +2618,7 @@ impl App {
         };
 
         if source == &**target {
-            line.extend([source_span(), Span::raw(" ")]);
+            line.extend([source_span(self.theme), Span::raw(" ")]);
         }
 
         let display = match source {
@@ -2602,9 +2630,9 @@ impl App {
             ),
         };
         line.extend([
-            Span::raw("<< ").mode_colors(&self.mode),
-            Span::raw(display).mode_colors(&self.mode),
-            Span::raw(" >>").mode_colors(&self.mode),
+            Span::raw("<< ").mode_colors(&self.mode, self.theme),
+            Span::raw(display).mode_colors(&self.mode, self.theme),
+            Span::raw(" >>").mode_colors(&self.mode, self.theme),
             Span::raw(" "),
         ]);
     }
@@ -2620,41 +2648,47 @@ impl App {
         };
 
         if *mode.source == **target {
-            line.extend([source_span(), Span::raw(" ")]);
+            line.extend([source_span(self.theme), Span::raw(" ")]);
             line.extend(
                 [
-                    Span::raw("<< ").mode_colors(&self.mode),
-                    Span::raw(NOOP).mode_colors(&self.mode),
+                    Span::raw("<< ").mode_colors(&self.mode, self.theme),
+                    Span::raw(NOOP).mode_colors(&self.mode, self.theme),
                 ]
                 .into_iter()
                 .chain(match mode.message_composer {
                     CommitMessageComposer::Editor => None,
                     CommitMessageComposer::Empty => {
-                        Some(Span::raw(" (empty message)").mode_colors(&self.mode))
+                        Some(Span::raw(" (empty message)").mode_colors(&self.mode, self.theme))
                     }
                     CommitMessageComposer::Inline => {
-                        Some(Span::raw(" (reword inline)").mode_colors(&self.mode))
+                        Some(Span::raw(" (reword inline)").mode_colors(&self.mode, self.theme))
                     }
                 })
-                .chain([Span::raw(" >>").mode_colors(&self.mode), Span::raw(" ")]),
+                .chain([
+                    Span::raw(" >>").mode_colors(&self.mode, self.theme),
+                    Span::raw(" "),
+                ]),
             );
         } else if let Some(display) = commit_operation_display(data, mode) {
             line.extend(
                 [
-                    Span::raw("<< ").mode_colors(&self.mode),
-                    Span::raw(display).mode_colors(&self.mode),
+                    Span::raw("<< ").mode_colors(&self.mode, self.theme),
+                    Span::raw(display).mode_colors(&self.mode, self.theme),
                 ]
                 .into_iter()
                 .chain(match mode.message_composer {
                     CommitMessageComposer::Editor => None,
                     CommitMessageComposer::Empty => {
-                        Some(Span::raw(" (empty message)").mode_colors(&self.mode))
+                        Some(Span::raw(" (empty message)").mode_colors(&self.mode, self.theme))
                     }
                     CommitMessageComposer::Inline => {
-                        Some(Span::raw(" (reword inline)").mode_colors(&self.mode))
+                        Some(Span::raw(" (reword inline)").mode_colors(&self.mode, self.theme))
                     }
                 })
-                .chain([Span::raw(" >>").mode_colors(&self.mode), Span::raw(" ")]),
+                .chain([
+                    Span::raw(" >>").mode_colors(&self.mode, self.theme),
+                    Span::raw(" "),
+                ]),
             );
         }
     }
@@ -2666,26 +2700,24 @@ impl App {
         line: &mut Line<'static>,
     ) {
         if data.cli_id().is_some_and(|target| *mode.source == **target) {
-            line.extend([source_span(), Span::raw(" ")]);
+            line.extend([source_span(self.theme), Span::raw(" ")]);
             line.extend([
-                Span::raw("<< ").mode_colors(&self.mode),
-                Span::raw(NOOP).mode_colors(&self.mode),
-                Span::raw(" >>").mode_colors(&self.mode),
+                Span::raw("<< ").mode_colors(&self.mode, self.theme),
+                Span::raw(NOOP).mode_colors(&self.mode, self.theme),
+                Span::raw(" >>").mode_colors(&self.mode, self.theme),
                 Span::raw(" "),
             ]);
         } else if let Some(display) = move_operation_display(data, mode) {
             line.extend([
-                Span::raw("<< ").mode_colors(&self.mode),
-                Span::raw(display).mode_colors(&self.mode),
-                Span::raw(" >>").mode_colors(&self.mode),
+                Span::raw("<< ").mode_colors(&self.mode, self.theme),
+                Span::raw(display).mode_colors(&self.mode, self.theme),
+                Span::raw(" >>").mode_colors(&self.mode, self.theme),
                 Span::raw(" "),
             ]);
         }
     }
 
     fn render_hotbar(&self, area: Rect, frame: &mut Frame) {
-        let t = theme::get();
-
         let mode_span = Span::raw(format!(
             "  {}  ",
             match self.mode {
@@ -2698,7 +2730,7 @@ impl App {
                 Mode::Details => "details",
             }
         ))
-        .mode_colors(&self.mode);
+        .mode_colors(&self.mode, self.theme);
 
         let layout = Layout::horizontal([
             Constraint::Length(mode_span.width() as _),
@@ -2726,13 +2758,13 @@ impl App {
                     .peekable();
                 while let Some(key_bind) = key_binds_iter.next() {
                     line.extend([
-                        Span::styled(key_bind.chord_display(), t.legend),
+                        Span::styled(key_bind.chord_display(), self.theme.legend),
                         Span::raw(" "),
-                        Span::styled(key_bind.short_description(), t.hint),
+                        Span::styled(key_bind.short_description(), self.theme.hint),
                     ]);
 
                     if key_binds_iter.peek().is_some() {
-                        line.push_span(Span::styled(" • ", t.hint));
+                        line.push_span(Span::styled(" • ", self.theme.hint));
                     }
                 }
 
@@ -2763,7 +2795,7 @@ impl App {
 
     /// Renders transient toasts stacked in the content area.
     fn render_toasts(&self, area: Rect, frame: &mut Frame) {
-        toast::render_toasts(frame, area, &self.toasts);
+        toast::render_toasts(frame, area, &self.toasts, self.theme);
     }
 
     fn render_inline_reword(&self, area: Rect, frame: &mut Frame) {
@@ -3043,6 +3075,7 @@ enum Message {
     MoveCursorPreviousSection,
     MoveCursorNextSection,
     SelectUnassigned,
+    SelectMergeBase,
     PickAndGotoBranch,
     SelectBranch(FullName),
 
@@ -3061,7 +3094,8 @@ enum Message {
 
     // Utilities
     CopySelection,
-    RegisterMessageOnDrop(Rc<Receiver<Message>>),
+    #[expect(clippy::enum_variant_names)]
+    RegisterOutOfBandMessage(Rc<Receiver<Message>>),
     WithOneFrameDelay(Box<Message>),
     AndThen {
         lhs: Box<Message>,
@@ -3272,17 +3306,17 @@ fn move_operation_display(data: &StatusOutputLineData, mode: &MoveMode) -> Optio
     }
 }
 
-fn source_span() -> Span<'static> {
-    Span::raw("<< source >>").mode_colors(&Mode::Normal)
+fn source_span(theme: &'static Theme) -> Span<'static> {
+    Span::raw("<< source >>").mode_colors(&Mode::Normal, theme)
 }
 
 trait SpanExt {
-    fn mode_colors(self, mode: &Mode) -> Self;
+    fn mode_colors(self, mode: &Mode, theme: &'static Theme) -> Self;
 }
 
 impl SpanExt for Span<'_> {
-    fn mode_colors(self, mode: &Mode) -> Self {
-        self.fg(mode.fg()).bg(mode.bg())
+    fn mode_colors(self, mode: &Mode, theme: &'static Theme) -> Self {
+        self.fg(mode.fg(theme)).bg(mode.bg(theme))
     }
 }
 

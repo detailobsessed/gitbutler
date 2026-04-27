@@ -26,7 +26,7 @@ use ratatui::{
 };
 use syntect::{
     easy::HighlightLines,
-    highlighting::{Theme, ThemeSet},
+    highlighting::{self, ThemeSet},
     parsing::{SyntaxReference, SyntaxSet},
 };
 use unicode_width::UnicodeWidthStr;
@@ -40,7 +40,7 @@ use crate::{
         message_on_drop::message_on_drop, mode::CommittedHunk,
     },
     id::{UncommittedCliId, UncommittedHunk},
-    theme,
+    theme::Theme,
 };
 
 use super::RubSource;
@@ -69,6 +69,8 @@ pub(super) enum DetailsMessage {
     SelectPrevSection,
     ScrollUp(usize),
     ScrollDown(usize),
+    GotoTop,
+    GotoBottom,
     StartRub,
     Unlock,
 }
@@ -91,14 +93,15 @@ pub(super) struct Details {
     widget: Option<DetailsAndDiffWidget>,
     renderer: IncrementalDiffRenderer,
     syntax_set: DebugAsType<OnDemand<SyntaxSet>>,
-    syntax_theme: DebugAsType<OnDemand<Theme>>,
+    syntax_theme: DebugAsType<OnDemand<highlighting::Theme>>,
     visibility: DetailsVisibility,
     line_highlight_cache: LineHighlightCache,
     is_locked: bool,
+    theme: &'static Theme,
 }
 
 impl Details {
-    pub(super) fn new_hidden() -> Self {
+    pub(super) fn new_hidden(theme: &'static Theme) -> Self {
         Self {
             is_dirty: false,
             is_locked: false,
@@ -121,14 +124,15 @@ impl Details {
                 )
             })
             .into(),
+            theme,
         }
     }
 
-    pub(super) fn new_visible() -> Self {
+    pub(super) fn new_visible(theme: &'static Theme) -> Self {
         Self {
             is_dirty: true,
             visibility: DetailsVisibility::VisibleVertical,
-            ..Self::new_hidden()
+            ..Self::new_hidden(theme)
         }
     }
 
@@ -195,7 +199,7 @@ impl Details {
             | Message::GrowDetails
             | Message::ShrinkDetails
             | Message::PickAndGotoBranch
-            | Message::RegisterMessageOnDrop(_)
+            | Message::RegisterOutOfBandMessage(_)
             | Message::WithOneFrameDelay(_)
             | Message::EnterNormalMode => false,
 
@@ -205,6 +209,7 @@ impl Details {
             | Message::MoveCursorPreviousSection
             | Message::MoveCursorNextSection
             | Message::SelectUnassigned
+            | Message::SelectMergeBase
             | Message::Reload(_)
             | Message::NewBranch => true,
 
@@ -241,6 +246,8 @@ impl Details {
                 | DetailsMessage::SelectFirstSection
                 | DetailsMessage::SelectNextSection
                 | DetailsMessage::SelectPrevSection
+                | DetailsMessage::GotoTop
+                | DetailsMessage::GotoBottom
                 | DetailsMessage::StartRub
                 | DetailsMessage::ScrollUp(_)
                 | DetailsMessage::ScrollDown(_)
@@ -276,6 +283,16 @@ impl Details {
                 self.cursor
                     .move_selection_by(&self.renderer.sections, |i| i.saturating_sub(1));
 
+                self.ensure_selection_visible(viewport);
+            }
+            DetailsMessage::GotoTop => {
+                self.cursor
+                    .move_selection_by(&self.renderer.sections, |_| 0);
+                self.scroll_top = 0;
+            }
+            DetailsMessage::GotoBottom => {
+                self.cursor
+                    .move_selection_by(&self.renderer.sections, |_| usize::MAX);
                 self.ensure_selection_visible(viewport);
             }
             DetailsMessage::ToggleVisibility => {
@@ -397,6 +414,7 @@ impl Details {
                 &syntax_set,
                 &theme,
                 &mut self.line_highlight_cache,
+                self.theme,
                 widget.diff_line_items_mut(),
             );
             match result {
@@ -431,6 +449,7 @@ impl Details {
                     &*self.syntax_set.get()?,
                     &mut self.renderer,
                     previous_diff_line_items,
+                    self.theme,
                 )?),
                 CliId::Uncommitted(uncommitted) => {
                     let wt_changes = but_api::diff::changes_in_worktree(ctx)?;
@@ -444,6 +463,7 @@ impl Details {
                         &*self.syntax_set.get()?,
                         &mut self.renderer,
                         previous_diff_line_items,
+                        self.theme,
                     )?)
                 }
                 // the tui never shows path prefix ids, those only come from users
@@ -461,6 +481,7 @@ impl Details {
                     &*self.syntax_set.get()?,
                     &mut self.renderer,
                     previous_diff_line_items,
+                    self.theme,
                 )?),
                 CliId::Branch { name, .. } => Some(from_branch(
                     ctx,
@@ -468,6 +489,7 @@ impl Details {
                     &*self.syntax_set.get()?,
                     &mut self.renderer,
                     previous_diff_line_items,
+                    self.theme,
                 )?),
                 CliId::Unassigned { .. } => {
                     let wt_changes = but_api::diff::changes_in_worktree(ctx)?;
@@ -481,6 +503,7 @@ impl Details {
                         &*self.syntax_set.get()?,
                         &mut self.renderer,
                         previous_diff_line_items,
+                        self.theme,
                     )?)
                 }
                 CliId::Stack { stack_id, .. } => {
@@ -495,6 +518,7 @@ impl Details {
                         &*self.syntax_set.get()?,
                         &mut self.renderer,
                         previous_diff_line_items,
+                        self.theme,
                     )?)
                 }
             };
@@ -511,6 +535,7 @@ impl Details {
                         &syntax_set,
                         &theme,
                         &mut self.line_highlight_cache,
+                        self.theme,
                         widget.diff_line_items_mut(),
                     ) {
                         RenderNextChunkResult::Done => {
@@ -528,12 +553,12 @@ impl Details {
     pub(super) fn render(&self, area: Rect, frame: &mut Frame) {
         let outer_block = Block::bordered()
             .borders(Borders::LEFT)
-            .border_style(theme::get().border);
+            .border_style(self.theme.border);
         let inner_area = outer_block.inner(area);
         frame.render_widget(outer_block, area);
 
         if let Some(diff) = &self.widget {
-            diff.render(&self.cursor, self.scroll_top, inner_area, frame);
+            diff.render(&self.cursor, self.scroll_top, inner_area, frame, self.theme);
         }
     }
 }
@@ -705,7 +730,14 @@ impl DetailsAndDiffWidget {
         ))
     }
 
-    fn render(&self, cursor: &DetailsCursor, scroll_top: usize, area: Rect, buf: &mut Frame) {
+    fn render(
+        &self,
+        cursor: &DetailsCursor,
+        scroll_top: usize,
+        area: Rect,
+        buf: &mut Frame,
+        theme: &'static Theme,
+    ) {
         enum ListItemOrString<'a> {
             ListItem(&'a ListItem<'a>),
             ListItemInSection(&'a SectionId, &'a ListItem<'a>),
@@ -765,7 +797,7 @@ impl DetailsAndDiffWidget {
                 {
                     list_item
                         .to_owned()
-                        .style(theme::get().discrete_selection_highlight)
+                        .style(theme.discrete_selection_highlight)
                 } else {
                     list_item.to_owned()
                 }
@@ -783,6 +815,7 @@ fn from_commit(
     syntax_set: &SyntaxSet,
     renderer: &mut IncrementalDiffRenderer,
     diff_line_items: Option<Vec<RenderedDiffLine>>,
+    theme: &'static Theme,
 ) -> anyhow::Result<DetailsAndDiffWidget> {
     let commit_details =
         but_api::diff::commit_details(ctx, commit_id, but_api::diff::ComputeLineStats::No)?;
@@ -790,15 +823,15 @@ fn from_commit(
     let header_items = Vec::from([
         ListItem::new(Line::from_iter([
             Span::raw(format!("{:<11}", "Commit ID:")),
-            Span::styled(commit_id.to_hex().to_string(), theme::get().commit_id),
+            Span::styled(commit_id.to_hex().to_string(), theme.commit_id),
         ])),
         ListItem::new(Line::from_iter(
             once(Span::raw(format!("{:<11}", "Author:")))
-                .chain(render_signature(&commit_details.commit.author)),
+                .chain(render_signature(&commit_details.commit.author, theme)),
         )),
         ListItem::new(Line::from_iter(
             once(Span::raw(format!("{:<11}", "Committer:")))
-                .chain(render_signature(&commit_details.commit.committer)),
+                .chain(render_signature(&commit_details.commit.committer, theme)),
         )),
     ]);
 
@@ -810,7 +843,14 @@ fn from_commit(
         .map(|change| TreeChange::from(change.clone()))
         .collect::<Vec<_>>();
 
-    build_tree_changes(ctx, &tree_changes, Some(commit_id), syntax_set, renderer);
+    build_tree_changes(
+        ctx,
+        &tree_changes,
+        Some(commit_id),
+        syntax_set,
+        renderer,
+        theme,
+    );
 
     Ok(DetailsAndDiffWidget::FromCommit {
         header_items,
@@ -824,6 +864,7 @@ fn from_uncommitted_hunks(
     syntax_set: &SyntaxSet,
     renderer: &mut IncrementalDiffRenderer,
     diff_line_items: Option<Vec<RenderedDiffLine>>,
+    theme: &'static Theme,
 ) -> anyhow::Result<DetailsAndDiffWidget> {
     for (raw_id, cli_id, UncommittedHunk { hunk_assignment }) in uncommitted_hunks {
         let section = renderer.new_section_mut(SectionId::ShortId(cli_id));
@@ -832,9 +873,10 @@ fn from_uncommitted_hunks(
             hunk_assignment.path_bytes.as_ref(),
             Some(ShortIdOrTreeStatus::ShortId(raw_id)),
             &mut section.content,
+            theme,
         );
 
-        build_hunk_assignment(hunk_assignment, syntax_set, &mut section.content);
+        build_hunk_assignment(hunk_assignment, syntax_set, theme, &mut section.content);
     }
 
     Ok(DetailsAndDiffWidget::FromDiffLines {
@@ -849,6 +891,7 @@ fn from_committed_file(
     syntax_set: &SyntaxSet,
     renderer: &mut IncrementalDiffRenderer,
     diff_line_items: Option<Vec<RenderedDiffLine>>,
+    theme: &'static Theme,
 ) -> anyhow::Result<DetailsAndDiffWidget> {
     let commit_details =
         but_api::diff::commit_details(ctx, commit_id, but_api::diff::ComputeLineStats::No)?;
@@ -860,7 +903,14 @@ fn from_committed_file(
         .map(|change| TreeChange::from(change.clone()))
         .collect::<Vec<_>>();
 
-    build_tree_changes(ctx, &tree_changes, Some(commit_id), syntax_set, renderer);
+    build_tree_changes(
+        ctx,
+        &tree_changes,
+        Some(commit_id),
+        syntax_set,
+        renderer,
+        theme,
+    );
 
     Ok(DetailsAndDiffWidget::FromDiffLines {
         diff_line_items: diff_line_items.unwrap_or_default(),
@@ -873,10 +923,18 @@ fn from_branch(
     syntax_set: &SyntaxSet,
     renderer: &mut IncrementalDiffRenderer,
     diff_line_items: Option<Vec<RenderedDiffLine>>,
+    theme: &'static Theme,
 ) -> anyhow::Result<DetailsAndDiffWidget> {
     let tree_changes = but_api::branch::branch_diff(ctx, name)?;
 
-    build_tree_changes(ctx, &tree_changes.changes, None, syntax_set, renderer);
+    build_tree_changes(
+        ctx,
+        &tree_changes.changes,
+        None,
+        syntax_set,
+        renderer,
+        theme,
+    );
 
     Ok(DetailsAndDiffWidget::FromDiffLines {
         diff_line_items: diff_line_items.unwrap_or_default(),
@@ -1040,8 +1098,9 @@ impl IncrementalDiffRenderer {
     fn render_next_chunk(
         &mut self,
         syntax_set: &SyntaxSet,
-        theme: &Theme,
+        syntax_theme: &highlighting::Theme,
         cache: &mut LineHighlightCache,
+        theme: &'static Theme,
         out: &mut Vec<RenderedDiffLine>,
     ) -> RenderNextChunkResult {
         loop {
@@ -1170,8 +1229,7 @@ impl IncrementalDiffRenderer {
                         continue;
                     }
 
-                    let mut highlight_lines = HighlightLines::new(syntax.as_ref(), theme);
-                    let t = theme::get();
+                    let mut highlight_lines = HighlightLines::new(syntax.as_ref(), syntax_theme);
 
                     for line in diff.iter().skip(*line_idx).take(self.chunk_size) {
                         *line_idx += 1;
@@ -1181,19 +1239,19 @@ impl IncrementalDiffRenderer {
                             let item = ListItem::new(Line::from_iter(
                                 [
                                     Span::raw(" ".repeat(*old_width as _)),
-                                    Span::styled(" ┊ ", t.border),
+                                    Span::styled(" ┊ ", theme.border),
                                     Span::raw(
                                         " ".repeat((*new_width - num_digits(*new_line_num)) as _),
                                     ),
-                                    Span::raw(new_line_num.to_string()).style(t.addition),
-                                    Span::styled(" │ ", t.border),
-                                    Span::raw("+").style(t.addition_rich),
+                                    Span::raw(new_line_num.to_string()).style(theme.addition),
+                                    Span::styled(" │ ", theme.border),
+                                    Span::raw("+").style(theme.addition_rich),
                                 ]
                                 .into_iter()
                                 .chain(syntax_highlight(
                                     &code,
                                     path.as_ref(),
-                                    t.addition_rich.bg,
+                                    theme.addition_rich.bg,
                                     &mut highlight_lines,
                                     syntax_set,
                                     cache,
@@ -1208,17 +1266,17 @@ impl IncrementalDiffRenderer {
                                     Span::raw(
                                         " ".repeat((*old_width - num_digits(*old_line_num)) as _),
                                     ),
-                                    Span::raw(old_line_num.to_string()).style(t.deletion),
-                                    Span::styled(" ┊ ", t.border),
+                                    Span::raw(old_line_num.to_string()).style(theme.deletion),
+                                    Span::styled(" ┊ ", theme.border),
                                     Span::raw(" ".repeat(*new_width as _)),
-                                    Span::styled(" │ ", t.border),
-                                    Span::raw("-").style(t.deletion_rich),
+                                    Span::styled(" │ ", theme.border),
+                                    Span::raw("-").style(theme.deletion_rich),
                                 ]
                                 .into_iter()
                                 .chain(syntax_highlight(
                                     &code,
                                     path.as_ref(),
-                                    t.deletion_rich.bg,
+                                    theme.deletion_rich.bg,
                                     &mut highlight_lines,
                                     syntax_set,
                                     cache,
@@ -1234,13 +1292,13 @@ impl IncrementalDiffRenderer {
                                     Span::raw(
                                         " ".repeat((*old_width - num_digits(*old_line_num)) as _),
                                     ),
-                                    Span::styled(old_line_num.to_string(), t.hint),
-                                    Span::styled(" ┊ ", t.border),
+                                    Span::styled(old_line_num.to_string(), theme.hint),
+                                    Span::styled(" ┊ ", theme.border),
                                     Span::raw(
                                         " ".repeat((*new_width - num_digits(*new_line_num)) as _),
                                     ),
-                                    Span::styled(new_line_num.to_string(), t.hint),
-                                    Span::styled(" │  ", t.border),
+                                    Span::styled(new_line_num.to_string(), theme.hint),
+                                    Span::styled(" │  ", theme.border),
                                 ]
                                 .into_iter()
                                 .chain(syntax_highlight(
@@ -1274,6 +1332,7 @@ impl IncrementalDiffRenderer {
 fn build_hunk_assignment(
     hunk_assignment: &HunkAssignment,
     syntax_set: &SyntaxSet,
+    theme: &'static Theme,
     out: &mut Vec<SectionContent>,
 ) {
     if let Some(hunk_header) = hunk_assignment.hunk_header {
@@ -1293,6 +1352,7 @@ fn build_hunk_assignment(
                 hunk,
                 is_result_of_binary_to_text_conversion,
                 syntax_set,
+                theme,
                 out,
             );
         } else {
@@ -1311,6 +1371,7 @@ fn build_tree_changes(
     commit_id: Option<gix::ObjectId>,
     syntax_set: &SyntaxSet,
     renderer: &mut IncrementalDiffRenderer,
+    theme: &'static Theme,
 ) {
     for tree_change in tree_changes {
         if let Some(patch) = but_api::diff::tree_change_diffs(ctx, tree_change.clone())
@@ -1346,6 +1407,7 @@ fn build_tree_changes(
                                 tree_change.path.as_ref(),
                                 Some(ShortIdOrTreeStatus::TreeStatus(&tree_change.status)),
                                 &mut header,
+                                theme,
                             );
                             section.content.push(SectionContent::FileHeader(header));
                         }
@@ -1355,6 +1417,7 @@ fn build_tree_changes(
                             diff_hunk,
                             is_result_of_binary_to_text_conversion,
                             syntax_set,
+                            theme,
                             &mut section.content,
                         );
                     }
@@ -1367,6 +1430,7 @@ fn build_tree_changes(
                         tree_change.path.as_ref(),
                         Some(ShortIdOrTreeStatus::TreeStatus(&tree_change.status)),
                         &mut header,
+                        theme,
                     );
                     section.content.push(SectionContent::FileHeader(header));
 
@@ -1382,6 +1446,7 @@ fn build_tree_changes(
                         tree_change.path.as_ref(),
                         Some(ShortIdOrTreeStatus::TreeStatus(&tree_change.status)),
                         &mut header,
+                        theme,
                     );
                     section.content.push(SectionContent::FileHeader(header));
 
@@ -1404,11 +1469,11 @@ fn render_hunk_path_header(
     path: &BStr,
     status: Option<ShortIdOrTreeStatus<'_>>,
     out: &mut Vec<ListItem<'static>>,
+    theme: &'static Theme,
 ) {
-    let t = theme::get();
     let status = status.map(|id_or_status| match id_or_status {
-        ShortIdOrTreeStatus::ShortId(id) => Span::styled(id.to_owned(), t.cli_id),
-        ShortIdOrTreeStatus::TreeStatus(status) => change_status(status),
+        ShortIdOrTreeStatus::ShortId(id) => Span::styled(id.to_owned(), theme.cli_id),
+        ShortIdOrTreeStatus::TreeStatus(status) => change_status(status, theme),
     });
     let path = path.to_string();
     let path_line = Line::from_iter(
@@ -1421,7 +1486,7 @@ fn render_hunk_path_header(
             )
             .chain([Span::raw(path)]),
     );
-    out.extend(bordered_line_top_right_bottom(path_line).map(ListItem::new));
+    out.extend(bordered_line_top_right_bottom(path_line, theme).map(ListItem::new));
     out.push(ListItem::from(""));
 }
 
@@ -1429,10 +1494,11 @@ fn build_hunk_path_header(
     path: &BStr,
     status: Option<ShortIdOrTreeStatus<'_>>,
     out: &mut Vec<SectionContent>,
+    theme: &'static Theme,
 ) {
     let status = status.map(|id_or_status| match id_or_status {
         ShortIdOrTreeStatus::ShortId(id) => Span::raw(id.to_owned()).blue(),
-        ShortIdOrTreeStatus::TreeStatus(status) => change_status(status),
+        ShortIdOrTreeStatus::TreeStatus(status) => change_status(status, theme),
     });
     let path = path.to_string();
     let path_line = Line::from_iter(
@@ -1446,49 +1512,54 @@ fn build_hunk_path_header(
             .chain([Span::raw(path)]),
     );
     out.push(SectionContent::FileHeader(
-        bordered_line_top_right_bottom(path_line)
+        bordered_line_top_right_bottom(path_line, theme)
             .map(ListItem::new)
             .chain([ListItem::from("")])
             .collect(),
     ));
 }
 
-fn change_status(status: &TreeStatus) -> Span<'static> {
-    let t = theme::get();
+fn change_status(status: &TreeStatus, theme: &'static Theme) -> Span<'static> {
     match status {
-        TreeStatus::Addition { .. } => Span::styled("added", t.addition),
-        TreeStatus::Deletion { .. } => Span::styled("deleted", t.deletion),
-        TreeStatus::Modification { .. } => Span::styled("modified", t.modification),
-        TreeStatus::Rename { .. } => Span::styled("renamed", t.renaming),
+        TreeStatus::Addition { .. } => Span::styled("added", theme.addition),
+        TreeStatus::Deletion { .. } => Span::styled("deleted", theme.deletion),
+        TreeStatus::Modification { .. } => Span::styled("modified", theme.modification),
+        TreeStatus::Rename { .. } => Span::styled("renamed", theme.renaming),
     }
 }
 
-fn bordered_line_top_right_bottom(mut text: Line<'static>) -> impl Iterator<Item = Line<'static>> {
+fn bordered_line_top_right_bottom(
+    mut text: Line<'static>,
+    theme: &'static Theme,
+) -> impl Iterator<Item = Line<'static>> {
     let width_including_padding = text.width() + 1;
-    let t = theme::get();
 
     text.spans
-        .extend([Span::raw(" "), Span::styled("│", t.border)]);
+        .extend([Span::raw(" "), Span::styled("│", theme.border)]);
 
     [
-        Line::from_iter(repeat_n("─", width_including_padding).chain(once("╮"))).style(t.border),
+        Line::from_iter(repeat_n("─", width_including_padding).chain(once("╮")))
+            .style(theme.border),
         text,
-        Line::from_iter(repeat_n("─", width_including_padding).chain(once("╯"))).style(t.border),
+        Line::from_iter(repeat_n("─", width_including_padding).chain(once("╯")))
+            .style(theme.border),
     ]
     .into_iter()
 }
 
-fn render_signature(sig: &Signature) -> impl IntoIterator<Item = Span<'static>> {
-    let t = theme::get();
+fn render_signature(
+    sig: &Signature,
+    theme: &'static Theme,
+) -> impl IntoIterator<Item = Span<'static>> {
     [
-        Span::styled(sig.name.to_string(), t.user),
+        Span::styled(sig.name.to_string(), theme.user),
         Span::raw(" <"),
-        Span::styled(sig.email.to_string(), t.user),
+        Span::styled(sig.email.to_string(), theme.user),
         Span::raw(">"),
         Span::raw(" ("),
         Span::styled(
             sig.time.format_or_unix(gix::date::time::format::DEFAULT),
-            t.time,
+            theme.time,
         ),
         Span::raw(")"),
     ]
@@ -1500,6 +1571,7 @@ fn build_unified_patch(
     hunk: DiffHunk,
     is_result_of_binary_to_text_conversion: bool,
     syntax_set: &SyntaxSet,
+    theme: &'static Theme,
     content: &mut Vec<SectionContent>,
 ) {
     let DiffHunk {
@@ -1517,11 +1589,10 @@ fn build_unified_patch(
     }
 
     if let Some(headers) = diff.lines().next() {
-        let t = theme::get();
         content.extend([SectionContent::HunkHeader([
-            ListItem::new(Span::styled(headers.to_str_lossy().to_string(), t.hint)),
+            ListItem::new(Span::styled(headers.to_str_lossy().to_string(), theme.hint)),
             ListItem::new(
-                Line::from_iter(repeat_n("─", headers.to_str_lossy().width())).style(t.border),
+                Line::from_iter(repeat_n("─", headers.to_str_lossy().width())).style(theme.border),
             ),
         ])]);
     }

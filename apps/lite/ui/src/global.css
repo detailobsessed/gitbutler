@@ -23,7 +23,8 @@
 	--color-item-row-action-hover-bg: var(--color-gray-200);
 	--color-item-row-highlighted-bg: #63cdc7;
 	--color-item-row-selected-action-hover-bg: var(--color-gray-900);
-	--color-item-row-selected-bg: var(--color-black);
+	--color-item-row-selected-unfocused-bg: var(--color-gray-700);
+	--color-item-row-selected-focused-bg: var(--color-black);
 	--color-item-row-selected-fg: var(--color-white);
 	--color-menu-item-highlighted-bg: var(--color-gray-50);
 	--color-move-indicator: var(--color-black);

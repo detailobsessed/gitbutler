@@ -1,4 +1,4 @@
-import { spawnAndLog, findAndClick, setElementValue } from "../utils.js";
+import { spawnAndLog, findAndClick, findElement, setElementValue } from "../utils.js";
 
 describe("Project", () => {
 	before(() => {
@@ -8,8 +8,7 @@ describe("Project", () => {
 	it("should add a local project", async () => {
 		await findAndClick('button[data-testid="analytics-continue"]');
 
-		const dirInputSelection = $('input[data-testid="test-directory-path"]');
-		const dirInput = await dirInputSelection.getElement();
+		const dirInput = await findElement('input[data-testid="test-directory-path"]');
 		await setElementValue(dirInput, "/tmp/gb-e2e-repos/one-vbranch-on-integration");
 
 		await findAndClick('button[data-testid="add-local-project"]');

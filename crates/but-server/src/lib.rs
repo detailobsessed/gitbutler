@@ -1156,7 +1156,10 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
             "/commit_uncommit_changes",
             but_post(commit::uncommit::commit_uncommit_changes_cmd),
         )
-        .route("/commit_undo", but_post(commit::undo::commit_undo_cmd))
+        .route(
+            "/commit_uncommit",
+            but_post(commit::uncommit::commit_uncommit_cmd),
+        )
         .route("/build_type", but_post(platform::build_type_cmd));
 
     // IRC commands — only registered when the `irc` feature is enabled.

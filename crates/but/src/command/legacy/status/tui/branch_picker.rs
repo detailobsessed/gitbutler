@@ -17,7 +17,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     command::legacy::status::tui::Message,
-    theme::{self, Theme},
+    theme::{PatchStyle as _, Theme},
     utils::DebugAsType,
 };
 
@@ -75,9 +75,8 @@ impl BranchPicker {
     where
         F: FnOnce(Item, &mut Vec<Message>) -> anyhow::Result<()> + 'static,
     {
-        let t = theme::get();
         let mut textarea = TextArea::default();
-        textarea.set_cursor_line_style(t.default);
+        textarea.set_cursor_line_style(theme.default);
 
         let mut items = NonEmpty::new(Item::Unassigned);
         items.extend(branch_names.map(Item::Branch));
@@ -99,7 +98,6 @@ impl BranchPicker {
     }
 
     pub(super) fn render(&self, area: Rect, frame: &mut Frame) {
-        let t = theme::get();
         let padding = Padding {
             left: 0,
             right: 0,
@@ -136,7 +134,7 @@ impl BranchPicker {
         let outer_block = Block::bordered()
             .padding(padding)
             .border_type(BorderType::Rounded)
-            .border_style(t.border);
+            .border_style(self.theme.border);
         let inner_area = outer_block.inner(centered_layout[0]);
         frame.render_widget(outer_block, centered_layout[0]);
 
@@ -199,7 +197,7 @@ impl BranchPicker {
                     }
                 };
                 if idx == self.cursor {
-                    item.style(t.selection_highlight)
+                    item.patch_style(self.theme.selection_highlight)
                 } else {
                     item
                 }

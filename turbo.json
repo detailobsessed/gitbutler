@@ -7,13 +7,21 @@
 		},
 		"build": {
 			"dependsOn": ["package"],
-			"passThroughEnv": ["SENTRY_AUTH_TOKEN", "GITHUB_TOKEN"],
+			"passThroughEnv": [
+				"SENTRY_AUTH_TOKEN",
+				"GITHUB_TOKEN",
+				"SVELTEKIT_OUT_DIR",
+				"VITE_BUILD_TARGET",
+				"VITE_BUTLER_API_BASE_URL",
+				"VITE_EMBEDDED_BUILD"
+			],
 			"env": ["SENTRY_RELEASE"],
 			"outputs": [
 				".svelte-kit/**",
 				"!.sveltekit/types",
 				"!.sveltekit/*.d.ts",
 				"dist/**",
+				"embedded-frontend/**",
 				".vercel/**"
 			]
 		},

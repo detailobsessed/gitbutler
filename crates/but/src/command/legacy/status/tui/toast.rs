@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Padding, Paragraph, Wrap},
 };
 
-use crate::theme;
+use crate::theme::Theme;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ToastKind {
@@ -49,8 +49,8 @@ impl Toasts {
     }
 }
 
-pub(super) fn render_toasts(frame: &mut Frame, area: Rect, toasts: &Toasts) {
-    let mut bottom_margin = 0;
+pub(super) fn render_toasts(frame: &mut Frame, area: Rect, toasts: &Toasts, theme: &'static Theme) {
+    let mut bottom_margin = 1;
     for toast in &toasts.toasts {
         if bottom_margin >= area.height {
             break;
@@ -64,6 +64,7 @@ pub(super) fn render_toasts(frame: &mut Frame, area: Rect, toasts: &Toasts) {
                 bottom: bottom_margin,
             },
             toast,
+            theme,
         );
 
         bottom_margin = bottom_margin.saturating_add(rendered_height);
@@ -75,8 +76,13 @@ struct ToastMargin {
     bottom: u16,
 }
 
-fn render_toast(frame: &mut Frame, area: Rect, margin: ToastMargin, toast: &Toast) -> u16 {
-    let t = theme::get();
+fn render_toast(
+    frame: &mut Frame,
+    area: Rect,
+    margin: ToastMargin,
+    toast: &Toast,
+    theme: &'static Theme,
+) -> u16 {
     let horizontal_padding: u16 = 1;
     let vertical_padding: u16 = 0;
     let border_width: u16 = 2;
@@ -142,9 +148,9 @@ fn render_toast(frame: &mut Frame, area: Rect, margin: ToastMargin, toast: &Toas
     frame.render_widget(Clear, toast_area);
 
     let border_style = match toast.kind {
-        ToastKind::Error => t.error,
-        ToastKind::Info => t.info,
-        ToastKind::Debug => t.hint,
+        ToastKind::Error => theme.error,
+        ToastKind::Info => theme.info,
+        ToastKind::Debug => theme.hint,
     };
 
     let widget = Paragraph::new(toast_text)

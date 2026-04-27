@@ -44,9 +44,8 @@ export const createInitialState = (): WorkspaceState => ({
 
 export const initialState: WorkspaceState = createInitialState();
 
-export const closeCommitFiles = (state: WorkspaceState, item: CommitItem) => {
+export const closeCommitFiles = (state: WorkspaceState) => {
 	state.expandedCommitId = null;
-	selectItem(state, commitItem(item));
 };
 
 export const enterMoveMode = (state: WorkspaceState, source: Item) => {
@@ -90,7 +89,6 @@ export const exitMode = (state: WorkspaceState) => {
 
 export const openCommitFiles = (state: WorkspaceState, item: CommitItem) => {
 	state.expandedCommitId = item.commitId;
-	selectItem(state, commitItem(item));
 };
 
 export const selectItem = (state: WorkspaceState, item: Item | null) => {
@@ -125,7 +123,7 @@ export const startRewordCommit = (state: WorkspaceState, item: CommitItem) => {
 
 export const toggleCommitFiles = (state: WorkspaceState, item: CommitItem) => {
 	if (state.expandedCommitId === item.commitId) {
-		closeCommitFiles(state, item);
+		closeCommitFiles(state);
 		return;
 	}
 

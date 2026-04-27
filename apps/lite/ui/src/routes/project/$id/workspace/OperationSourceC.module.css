@@ -1,9 +1,13 @@
 .dragPreview {
+	max-width: 400px;
 	padding: 8px;
+	overflow: hidden;
 	border: 1px solid light-dark(rgb(0 0 0 / 0.2), rgb(255 255 255 / 0.16));
 	border-radius: 8px;
 	background-color: var(--color-bg);
 	box-shadow: 0 12px 16px -8px light-dark(rgb(0 0 0 / 0.08), rgb(0 0 0 / 0.4));
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 /* This might be applied to an element that already has its own background, so

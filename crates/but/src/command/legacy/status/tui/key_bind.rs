@@ -17,13 +17,13 @@ pub(super) fn default_key_binds() -> KeyBinds {
         match mode {
             ModeDiscriminant::Normal => {
                 register_global_key_binds(&mut key_binds, Vec::from([mode]));
-                register_unassigned_key_binds(&mut key_binds, Vec::from([mode]));
+                register_long_jump_key_binds(&mut key_binds, Vec::from([mode]));
                 register_branch_picker_key_binds(&mut key_binds, Vec::from([mode]));
                 register_normal_mode_key_binds(&mut key_binds);
             }
             ModeDiscriminant::Rub => {
                 register_global_key_binds(&mut key_binds, Vec::from([mode]));
-                register_unassigned_key_binds(&mut key_binds, Vec::from([mode]));
+                register_long_jump_key_binds(&mut key_binds, Vec::from([mode]));
                 register_branch_picker_key_binds(&mut key_binds, Vec::from([mode]));
                 register_rub_mode_key_binds(&mut key_binds);
             }
@@ -35,13 +35,13 @@ pub(super) fn default_key_binds() -> KeyBinds {
             }
             ModeDiscriminant::Commit => {
                 register_global_key_binds(&mut key_binds, Vec::from([mode]));
-                register_unassigned_key_binds(&mut key_binds, Vec::from([mode]));
+                register_long_jump_key_binds(&mut key_binds, Vec::from([mode]));
                 register_branch_picker_key_binds(&mut key_binds, Vec::from([mode]));
                 register_commit_mode_key_binds(&mut key_binds);
             }
             ModeDiscriminant::Move => {
                 register_global_key_binds(&mut key_binds, Vec::from([mode]));
-                register_unassigned_key_binds(&mut key_binds, Vec::from([mode]));
+                register_long_jump_key_binds(&mut key_binds, Vec::from([mode]));
                 register_branch_picker_key_binds(&mut key_binds, Vec::from([mode]));
                 register_move_mode_key_binds(&mut key_binds);
             }
@@ -220,6 +220,22 @@ fn register_detail_key_binds(key_binds: &mut KeyBinds) {
     });
 
     key_binds.register(KeyBindDef {
+        short_description: "top",
+        key_matcher: press().code(KeyCode::Char('g')),
+        modes: Vec::from([ModeDiscriminant::Details]),
+        message: Message::Details(DetailsMessage::GotoTop),
+        hide_from_hotbar: false,
+    });
+
+    key_binds.register(KeyBindDef {
+        short_description: "bottom",
+        key_matcher: press().shift().code(KeyCode::Char('G')),
+        modes: Vec::from([ModeDiscriminant::Details]),
+        message: Message::Details(DetailsMessage::GotoBottom),
+        hide_from_hotbar: false,
+    });
+
+    key_binds.register(KeyBindDef {
         short_description: "hide details",
         key_matcher: press().code(KeyCode::Char('d')),
         modes: Vec::from([ModeDiscriminant::Details]),
@@ -310,13 +326,23 @@ fn register_global_key_binds(key_binds: &mut KeyBinds, modes: Vec<ModeDiscrimina
     register_grow_shrink_details_key_binds(key_binds, modes);
 }
 
-fn register_unassigned_key_binds(key_binds: &mut KeyBinds, modes: Vec<ModeDiscriminant>) {
+fn register_long_jump_key_binds(key_binds: &mut KeyBinds, modes: Vec<ModeDiscriminant>) {
     key_binds.register(KeyBindDef {
         short_description: "unassigned",
-        key_matcher: press().code(KeyCode::Char('z')),
+        key_matcher: press()
+            .code(KeyCode::Char('z'))
+            .alt_code(KeyCode::Char('g')),
         modes: modes.clone(),
         message: Message::SelectUnassigned,
         hide_from_hotbar: false,
+    });
+
+    key_binds.register(KeyBindDef {
+        short_description: "merge base",
+        key_matcher: press().shift().code(KeyCode::Char('G')),
+        modes: modes.clone(),
+        message: Message::SelectMergeBase,
+        hide_from_hotbar: true,
     });
 }
 
