@@ -21,6 +21,7 @@ pub(crate) fn teardown(
     ctx: &mut Context,
     checkout_to: Option<String>,
     out: &mut OutputChannel,
+    current_dir: &std::path::Path,
 ) -> CliResult<()> {
     let t = theme::get();
 
@@ -156,18 +157,11 @@ pub(crate) fn teardown(
         writeln!(out)?;
     }
 
-    // Uninstall managed hooks before checking out
-    if let Ok(repo) = ctx.repo.get()
-        && let Err(e) = gitbutler_repo::managed_hooks::uninstall_managed_hooks(&repo)
-        && let Some(out) = out.for_human()
-    {
-        writeln!(
-            out,
-            "  {}",
-            t.attention
-                .paint(format!("Warning: Failed to uninstall Git hooks: {e}"))
-        )?;
-    }
+    // Uninstall managed hooks via the universal `but hook uninstall` command.
+    // Best-effort: signature-checks each hook so user/external hooks are
+    // never touched, and surfaces an "externally managed" note when prek
+    // (or similar) is owning the hooks directory.
+    crate::command::hook::uninstall_internal(out, current_dir)?;
 
     // Check out the target branch using Git directly
     if let Some(out) = out.for_human() {

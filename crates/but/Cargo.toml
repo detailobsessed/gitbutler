@@ -73,6 +73,7 @@ but-error.workspace = true
 but-action = { workspace = true, optional = true }
 # Still uses `gitbutler-stack`, but otherwise it is non-legacy.
 but-hunk-assignment.workspace = true
+but-hooks.workspace = true
 but-rules = { workspace = true, optional = true }
 but-gerrit = { workspace = true, optional = true }
 but-worktrees = { workspace = true, optional = true }
