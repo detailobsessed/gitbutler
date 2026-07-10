@@ -114,7 +114,7 @@ pub(crate) fn app_settings() -> Result<&'static AppSettings> {
 }
 
 /// Handle `args` which must be what's passed by `std::env::args_os()`.
-pub async fn handle_args(args: impl Iterator<Item = OsString>) -> Result<()> {
+pub async fn handle_args(args: impl Iterator<Item = OsString>) -> Result<std::process::ExitCode> {
     let theme_preset_from_env: anyhow::Result<theme::ThemePreset> =
         if let Some(theme_name) = std::env::var_os(envs::BUT_THEME) {
             theme_name.to_string_lossy().parse()
@@ -148,7 +148,7 @@ pub async fn handle_args(args: impl Iterator<Item = OsString>) -> Result<()> {
     if args.iter().any(|arg| arg == "--version" || arg == "-V") {
         let version = option_env!("VERSION").unwrap_or("dev");
         println!("but {version}");
-        return Ok(());
+        return Ok(std::process::ExitCode::SUCCESS);
     }
 
     // Check if help is requested and show grouped help instead of clap's default
@@ -158,7 +158,7 @@ pub async fn handle_args(args: impl Iterator<Item = OsString>) -> Result<()> {
     if has_help_flag && !has_subcommand {
         let mut out = OutputChannel::new(early_help_format(&args));
         command::help::print_grouped(&mut out)?;
-        return Ok(());
+        return Ok(std::process::ExitCode::SUCCESS);
     }
 
     let args = expand_aliases(args);
@@ -171,7 +171,7 @@ pub async fn handle_args(args: impl Iterator<Item = OsString>) -> Result<()> {
     {
         let mut out = OutputChannel::new(early_help_format(&args));
         command::push::help::print(&mut out)?;
-        return Ok(());
+        return Ok(std::process::ExitCode::SUCCESS);
     }
 
     // Handle bare `but help -h` and `but help --help` to show the grouped help output.
@@ -182,7 +182,7 @@ pub async fn handle_args(args: impl Iterator<Item = OsString>) -> Result<()> {
     {
         let mut out = OutputChannel::new(early_help_format(&args));
         command::help::print_grouped(&mut out)?;
-        return Ok(());
+        return Ok(std::process::ExitCode::SUCCESS);
     }
 
     let mut args: Args = Args::parse_from(args);
@@ -225,7 +225,8 @@ pub async fn handle_args(args: impl Iterator<Item = OsString>) -> Result<()> {
         let Some(Subcommands::AgentLog { cmd }) = args.cmd.take() else {
             unreachable!("agentlog command was checked above")
         };
-        return run_agentlog_command(&args.current_dir, cmd, &mut out);
+        return run_agentlog_command(&args.current_dir, cmd, &mut out)
+            .map(|()| std::process::ExitCode::SUCCESS);
     }
     let app_settings = app_settings()?.clone();
 
@@ -271,6 +272,12 @@ pub async fn handle_args(args: impl Iterator<Item = OsString>) -> Result<()> {
     match result {
         Err(CliError::Internal(err)) => Err(err),
         Err(CliError::BadInput(bad_input)) => print_and_exit_non_zero(bad_input),
+        // The command already printed everything (the output channel was
+        // dropped and flushed when match_subcommand returned); only the exit
+        // code is left to convey. Returned instead of `process::exit` so
+        // destructors still run -- e.g. the tracing appender guard, which
+        // flushes buffered trace lines to the log file.
+        Err(CliError::Exit(code)) => Ok(std::process::ExitCode::from(code)),
         Err(CliError::ExternalCommandNotFound(command_name)) => {
             // We reparse without external subcommands allowed, which _should_ result in a proper
             // clap error, including suggestions for "near matches". This gives richer error
@@ -288,7 +295,7 @@ pub async fn handle_args(args: impl Iterator<Item = OsString>) -> Result<()> {
             // This shouldn't happen in practice but logically it could.
             print_and_exit_non_zero(CliError::ExternalCommandNotFound(command_name))
         }
-        Ok(()) => Ok(()),
+        Ok(()) => Ok(std::process::ExitCode::SUCCESS),
     }
 }
 

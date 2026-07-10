@@ -731,3 +731,66 @@ Learn more at https://docs.gitbutler.com/cli-overview
 
     Ok(())
 }
+
+/// When the user opted out of hooks via `gitbutler.installHooks=false`, setup
+/// must say hook installation was skipped instead of claiming hooks are being
+/// installed while direct commits to the workspace branch go unguarded.
+#[test]
+fn setup_with_hooks_opted_out_says_so() {
+    let env = Sandbox::open_with_default_settings("repo-no-remote");
+    env.invoke_git("config --local gitbutler.installHooks false");
+
+    env.but("setup")
+        .assert()
+        .success()
+        .stderr_eq(snapbox::str![])
+        .stdout_eq(snapbox::str![[r#"
+Setting up GitButler project...
+
+→ Adding repository to GitButler project registry
+  ✓ Repository already in project registry
+
+→ Configuring default target branch
+  No push remote found, creating gb-local remote...
+  ✓ Created gb-local remote tracking main
+  ✓ Set default target to: gb-local/main
+
+GitButler project setup complete!
+Target branch: gb-local/main
+Remote: gb-local
+
+  Note: Skipped Git hook installation (gitbutler.installHooks=false). Commits made directly to the workspace branch will not be blocked.
+
+Setting up your project for GitButler tooling. Some things to note:
+
+- Switching you to a special `gitbutler/workspace` branch to enable parallel branches
+- Skipping Git hooks (disabled via gitbutler.installHooks)
+
+To undo these changes and return to normal Git mode, either:
+
+    - Directly checkout a branch (`git checkout main`)
+    - Run `but teardown`
+
+More info: https://docs.gitbutler.com/workspace-branch
+
+
+
+██▄      ▄██  ▀██▀▀█▄ ▀██▀ ▀██▀ █▀▀██▀▀█
+████▄  ▄████   ██  ██  ██   ██  ▀  ██  ▀
+████████████   ██▀▀█▄  ██   ██     ██
+████▀  ▀████   ██  ██  ██   ██     ██
+██▀      ▀██  ▄██▄▄█▀  ▀█▄▄▄█▀   ▄▄██▄▄
+
+The command-line interface for GitButler ⋈
+
+$ but branch new <name>                       Create a new branch
+$ but status                                  View workspace status
+$ but commit -m <message>                     Commit changes to current branch
+$ but push                                    Push all branches
+$ but teardown                                Return to normal Git mode
+
+Learn more at https://docs.gitbutler.com/cli-overview
+
+
+"#]]);
+}

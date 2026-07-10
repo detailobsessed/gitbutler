@@ -49,7 +49,7 @@ fn effective_irc(
     }
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<std::process::ExitCode> {
     but_api::panic_capture::install_panic_hook();
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -580,7 +580,7 @@ fn main() -> anyhow::Result<()> {
                 }
             });
     });
-    Ok(())
+    Ok(std::process::ExitCode::SUCCESS)
 }
 
 /// read all objects, migrate them, and write them back if there was a migration.

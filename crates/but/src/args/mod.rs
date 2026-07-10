@@ -907,6 +907,13 @@ pub enum Subcommands {
     /// This is useful when you want to temporarily or permanently leave GitButler
     /// management and work with standard Git commands.
     ///
+    /// ## Exit codes
+    ///
+    /// - 0: teardown completed and all GitButler hooks were removed
+    /// - 3: teardown completed, but some GitButler hooks could not be removed
+    ///   (details are printed as warnings, and listed in `hookWarnings` with
+    ///   `--format json`)
+    ///
     /// ## Examples
     ///
     /// Exit GitButler mode:

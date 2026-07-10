@@ -397,6 +397,12 @@ impl Props {
             CliError::Internal(error) => {
                 props.insert_internal_error_details(error, command);
             }
+            CliError::Exit(code) => {
+                // Partial success: the command ran and printed its output.
+                // Record the exit code without counting it as a failure.
+                props.insert("error", Option::<String>::None);
+                props.insert("exitCode", *code);
+            }
         }
         props
     }
@@ -1133,6 +1139,25 @@ mod tests {
                 .len(),
             UNRECOGNIZED_SUBCOMMAND_MAX_CHARS
         );
+    }
+
+    /// `CliError::Exit` is a partial success -- the command ran and printed its
+    /// output -- so telemetry must not count it among failures, while keeping the
+    /// exit code visible.
+    #[test]
+    fn exit_code_partial_success_is_not_recorded_as_an_error() {
+        let exit_result = Err::<(), _>(CliError::Exit(3));
+        let props = Props::from_cli_error_result(
+            std::time::Instant::now(),
+            &exit_result,
+            CommandName::Stage,
+        );
+
+        assert!(
+            !props.values.contains_key("errorKind"),
+            "partial success must not be counted as a failure in telemetry"
+        );
+        assert_eq!(props.values["exitCode"], 3);
     }
 
     #[test]

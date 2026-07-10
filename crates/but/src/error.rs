@@ -129,6 +129,7 @@ impl CliError {
                 Self::ExternalCommandNotFound(command_name)
             }
             Self::Internal(value) => Self::Internal(value.context(context)),
+            Self::Exit(code) => Self::Exit(code),
         }
     }
 
@@ -140,6 +141,7 @@ impl CliError {
                 Self::ExternalCommandNotFound(command_name)
             }
             Self::Internal(value) => Self::Internal(value),
+            Self::Exit(code) => Self::Exit(code),
         }
     }
 
@@ -151,6 +153,7 @@ impl CliError {
                 Self::ExternalCommandNotFound(command_name)
             }
             Self::Internal(value) => Self::Internal(value),
+            Self::Exit(code) => Self::Exit(code),
         }
     }
 }
@@ -167,6 +170,8 @@ impl Display for CliError {
                 )
             }
             Self::Internal(value) => value.fmt(f),
+            // Never printed: the command has already written its output.
+            Self::Exit(code) => write!(f, "exit code {code}"),
         }
     }
 }
@@ -179,6 +184,9 @@ pub enum CliError {
     ExternalCommandNotFound(OsString),
     /// Something went wrong internally.
     Internal(anyhow::Error),
+    /// The command ran and printed all of its output, but wants the process to
+    /// exit with this code (e.g. partial success). Nothing further is printed.
+    Exit(u8),
 }
 
 pub type CliResult<T> = Result<T, CliError>;

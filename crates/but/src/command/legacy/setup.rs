@@ -410,24 +410,52 @@ pub(crate) fn repo(
         but_api::legacy::virtual_branches::switch_back_to_workspace_with_perm(ctx, perm)?;
     }
 
-    // Install managed hooks to prevent accidental git commits
-    if let Ok(repo) = ctx.repo.get()
-        && let Err(e) = gitbutler_repo::managed_hooks::install_managed_hooks(&repo)
-        && let Some(out) = out.for_human()
-    {
-        writeln!(
-            out,
-            "  {}",
-            t.attention.paint(format!(
-                "Warning: Failed to install GitButler managed hooks: {e}"
-            ))
-        )?;
+    // Install managed hooks to prevent accidental git commits. Partial
+    // successes matter as much as hard errors here: they mean some hook could
+    // not be installed or cleaned up, so tell the user instead of dropping
+    // the warnings.
+    let mut hooks_skipped = false;
+    if let Ok(repo) = ctx.repo.get() {
+        let problems = match gitbutler_repo::managed_hooks::install_managed_hooks(&repo) {
+            Ok(gitbutler_repo::managed_hooks::HookInstallationResult::PartialSuccess {
+                warnings,
+            }) => warnings,
+            Ok(gitbutler_repo::managed_hooks::HookInstallationResult::SkippedByConfig) => {
+                hooks_skipped = true;
+                Vec::new()
+            }
+            Ok(_) => Vec::new(),
+            Err(e) => vec![format!("Failed to install GitButler managed hooks: {e}")],
+        };
+        if let Some(out) = out.for_human() {
+            for problem in problems {
+                writeln!(
+                    out,
+                    "  {}",
+                    t.attention.paint(format!("Warning: {problem}"))
+                )?;
+            }
+            if hooks_skipped {
+                writeln!(
+                    out,
+                    "  {}",
+                    t.attention.paint(
+                        "Note: Skipped Git hook installation (gitbutler.installHooks=false). Commits made directly to the workspace branch will not be blocked."
+                    )
+                )?;
+            }
+        }
     }
 
     // if we switched - tell the user what this is all about
     if pre_head_name != "gitbutler/workspace"
         && let Some(out) = out.for_human()
     {
+        let hooks_note = if hooks_skipped {
+            "- Skipping Git hooks (disabled via gitbutler.installHooks)"
+        } else {
+            "- Installing Git hooks to help manage commits on the workspace branch"
+        };
         writeln!(
             out,
             "{}",
@@ -436,7 +464,7 @@ pub(crate) fn repo(
 Setting up your project for GitButler tooling. Some things to note:
 
 - Switching you to a special `gitbutler/workspace` branch to enable parallel branches
-- Installing Git hooks to help manage commits on the workspace branch
+{hooks_note}
 
 To undo these changes and return to normal Git mode, either:
 
